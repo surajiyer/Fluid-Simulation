@@ -18,6 +18,16 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\FluidSystem.h" />
+    <ClInclude Include="src\Inc.h" />
+    <ClInclude Include="src\SystemManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\FluidSystem.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\SystemManager.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{E231C492-2FF5-4441-ACDB-D8AB40D1236E}</ProjectGuid>
@@ -82,7 +92,11 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\AedoroLib\OpenGLBase\src;$(SolutionDir)\..\AedoroLib;$(SolutionDir)\..\Libraries\Eigen\eigen-eigen-67e894c6cd8f;$(ProjectDir)\src</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\AedoroLib;</AdditionalLibraryDirectories>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -104,14 +118,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\AedoroLib\OpenGLBase\src;$(SolutionDir)\..\AedoroLib;$(SolutionDir)\..\Libraries\Eigen\eigen-eigen-67e894c6cd8f;$(ProjectDir)\src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\AedoroLib;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

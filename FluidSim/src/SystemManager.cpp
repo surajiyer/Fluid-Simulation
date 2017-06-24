@@ -1,15 +1,15 @@
 #include "SystemManager.h"
+#include "FluidSystem.h"
+#include "FluidRenderer.h"
+#include "FluidFillers.h"
+
 #include <Tools/Include.h>
 #include <WindowWin32/InputManager_get.h>
 
 SystemManager::SystemManager()
 	: gEnableRender(true)
 {
-	if (gEnableRender) {
-		gpEngine = new GLCore::GLEngine();
-		gpEngine->RunAsync();
-	}
-	gInputListener = new System::InputManager_get();
+	Setup();
 }
 
 SystemManager::~SystemManager()
@@ -21,8 +21,8 @@ void SystemManager::Run()
 {
 	Tools::SetHighPriority();
 	auto t = Tools::TimeHelp::GetTime();
-	float base_dt = 0.0015f;
-	float dt = base_dt;
+	real base_dt = 0.0015f;
+	real dt = base_dt;
 
 	while
 		// (gpEngine ? gpEngine->Run_step() : true) {
@@ -35,12 +35,12 @@ void SystemManager::Run()
 			break;
 		}
 
-		// 		if (gpParticleSystem == nullptr) {
-		// 			Tools::Sleep(5);
-		// 			continue;
-		// 		}
+		if (gpFluidSystem == nullptr) {
+			Tools::Sleep(5);
+			continue;
+		}
 
-				// update
+		// update
 		if (gSimulationEnabled || gInputListener->IsKeyPressed('T')) {
 			// sdt is the time step we send to the system
 			float sdt = gTimeAnalyse.AvgDt(); // dt gTimeAnalise.AvgDt();
@@ -60,7 +60,7 @@ void SystemManager::Run()
 				<< " \tAvg. " << 1000 * gTimeAnalyse.AvgDt()
 				<< " \tMax. " << 1000 * gTimeAnalyse.dt_max;
 
-			//gRefreshVisual = true;
+			gRefreshVisual = true;
 			//if (gEnableRender && gpParticleRenderer) gpParticleRenderer->DoBuffer();
 		}
 		else {
@@ -81,8 +81,24 @@ void SystemManager::Run()
 	// if (gpEngine) gpEngine->Run_end();
 }
 
+void SystemManager::Setup()
+{
+	gInputListener = new System::InputManager_get();
+	gpFluidSystem = new FluidSystem();
+	gpFluidSystem->Setup({ 32, 32 });
+
+	if (gEnableRender) {
+		gpEngine = new GLCore::GLEngine();
+		gpEngine->BootInfo().window_info.windowedPrefResolution = {600, 600};
+		gpEngine->RunAsync();	
+		gpFluidRenderer = new FluidRenderer(gpEngine);
+		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
+	}
+}
+
 void SystemManager::Update(float dt)
 {
+	gpFluidSystem->Update(dt);
 	// reset forces in particles
 // 	gpParticleSystem->RecalculateForces();
 // 	gpParticleSystem->DampVelocity(dt);
@@ -98,7 +114,7 @@ void SystemManager::Update(float dt)
 
 void SystemManager::ReadInput()
 {
-	//gInputListener->PrepForNextFrame();
+	gInputListener->PrepForNextFrame();
 
 	// press "SPACE" to play / pause
 	if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Space)) {
@@ -124,15 +140,16 @@ void SystemManager::ReadInput()
 
 	System::InputManager::AState boardState;
 	boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
-// 	static std::vector<std::tuple<int, SceneGen, std::string>> scene_key_mapping = {
-// 	};
+ 	static std::vector<std::tuple<int, FluidFiller, std::string>> scene_key_mapping = {
+		{ 1, &FluidFillers::HalfFull, "Half full" },
+ 	};
 
-// 	for (auto entry : scene_key_mapping) {
-// 		if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Nr(std::get<0>(entry)), boardState)) {
-// 			SetSystem(std::get<1>(entry)());
-// 			std::cout << " > Scene set to: " << std::get<2>(entry) << " \t\t";
-// 		}
-// 	}
+ 	for (auto entry : scene_key_mapping) {
+ 		if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Nr(std::get<0>(entry)), boardState)) {
+ 			std::get<1>(entry)(gpFluidSystem);
+ 			std::cout << " > Scene set to: " << std::get<2>(entry) << " \t\t";
+ 		}
+ 	}
 }
 
 // void SystemManager::RenewRenderer()

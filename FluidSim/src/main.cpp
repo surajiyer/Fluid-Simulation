@@ -1,3 +1,6 @@
+#include "Inc.h"
+#include "SystemManager.h"
+
 #include <OpenGLBase/Include.h>
 #include <OpenGLBase/src/GLCore/GraphicsIncludes.h>
 #include <OpenGLBase/src/Example/GLExampleObject.h>
@@ -9,5 +12,6 @@
 #include <string>
 
 void main() {
-		
+	SystemManager sm;
+	sm.Run();
 }

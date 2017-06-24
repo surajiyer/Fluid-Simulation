@@ -16,15 +16,21 @@ public:
 	void Run();
 
 private:
+	void Setup();
 	void Update(float dt);
 	void ReadInput();
 	void RenewRenderer();
+
+	typedef void (*FluidFiller)(FluidSystem*);
 
 	System::InputManager*	gInputListener = nullptr;
 	GLCore::GLEngine*		gpEngine = nullptr;
 	bool					gEnableRender;
 	bool					gSimulationEnabled = false;
 	bool					gRefreshVisual = true;
+
+	FluidSystem*			gpFluidSystem;
+	FluidRenderer*			gpFluidRenderer = nullptr;
 
 	struct TimeAnalyse {
 	public:

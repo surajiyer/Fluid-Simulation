@@ -49,11 +49,16 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 		auto surface = gpFluidSystem->GetSize();
 		uint32_t pixel_count = surface.Area();
 		gPixels.resize(pixel_count * 3);
-		auto data = gpFluidSystem->GetDensities();
+		auto& density = gpFluidSystem->GetDensities();
+		auto& vel_x = gpFluidSystem->GetVelX();
+		auto& vel_y = gpFluidSystem->GetVelY();
 		for (int i = 0; i < pixel_count; i++) {
-			gPixels[i * 3 + 0] = data[i];
-			gPixels[i * 3 + 1] = data[i];
-			gPixels[i * 3 + 2] = data[i];
+			real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
+			real dens = density[i];
+			real value = speed;
+			gPixels[i * 3 + 0] = speed;
+			gPixels[i * 3 + 1] = dens;
+			gPixels[i * 3 + 2] = dens;
 		//std::cout << data[i] << ", ";
 		} // TODO : normalize?
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface.width, surface.height, 0, GL_RGB, GL_FLOAT, gPixels.data());

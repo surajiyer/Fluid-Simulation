@@ -85,7 +85,7 @@ void SystemManager::Setup()
 {
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
-	gpFluidSystem->Setup({ 32, 32 });
+	gpFluidSystem->Setup({ 128, 128 });
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();

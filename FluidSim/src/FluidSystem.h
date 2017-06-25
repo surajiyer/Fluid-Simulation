@@ -14,6 +14,9 @@ public:
 	Tools::Surface2D<uint32_t> GetSize();
 	std::vector<real>& GetDensities();
 
+	std::vector<real>& GetVelX();
+	std::vector<real>& GetVelY();
+
 	void SetZeroVelocity();
 
 private:
@@ -24,15 +27,62 @@ private:
 		return ix + iy * gTrueSurface.width;
 	}
 
+	// translations
+	inline int IX(int a, int b) {
+		return ID(a, b);
+	}
+	inline void set_bnd(int N, int b, list x) {
+		SetBorder(b, x);
+	}
+	inline void add_source(int N, list x, list s, float dt) {
+		AddArrayDt(x, s, dt);
+	}
+	inline void lin_solve(int N, int b, list x, list x0, float a, float c) {
+		LinearSolve(b, x, x0, a, c);
+	}
+	inline void diffuse(int N, int b, list x, list x0, float diff, float dt)
+	{
+		Diffuse(b, x, x0, diff, dt);
+	}
+	inline void advect(int N, int b, list d, list d0, list u, list v, float dt) {
+		Advect(b, d, d0, u, v, dt);
+	}
+	inline void project(int N, list u, list v, list p, list div)
+	{
+		Project(u, v, p, div);
+	}
+	inline list u() {
+		return gVelY.Curr();
+	}
+	inline list v() {
+		return gVelX.Curr();
+	}
+	inline list u0() {
+		return gVelY.Prev();
+	}
+	inline list v0() {
+		return gVelX.Prev();
+	}
+	inline list x() {
+		return gDens.Curr();
+	}
+	inline list x0() {
+		return gDens.Prev();
+	}
+	inline real visc() {
+		return gViscosity;
+	}
+
 	void DensityStep(real dt);
 	void VelocityStep(real dt);
 	void ForcesStep(real dt);
+	void DampStep(real dt);
 
 	void Diffuse(int b, list x, list x0, real strength, real dt);
 	void Advect(int b, list d, list d0, list u, list v, real dt);
 
 	void LinearSolve(int b, list x, list x0, real a, real c);
-	void SetBand(int b, list x);
+	void SetBorder(int b, list x);
 	void Project(list u, list v, list p, list div);
 	void AddArrayDt(list x, list s, real dt);
 
@@ -48,17 +98,18 @@ private:
 		uint8_t						gPrevID = 0;
 		uint8_t						gCurrID = 1;
 
-		inline list Current() {
+		inline list Curr() {
 			return gStates[gCurrID];
 		}
 
-		inline list Previous() {
+		inline list Prev() {
 			return gStates[gPrevID];
 		}
 
 		inline void Swap() {
+			auto temp = gPrevID;
 			gPrevID = gCurrID;
-			gCurrID = gPrevID ^ 1; // xor
+			gCurrID = temp; // gPrevID ^ 1; // xor
 		}
 	};
 
@@ -73,8 +124,8 @@ private:
 	real							gViscosity;
 
 	// data
-	FlipFlop<std::vector<real>>		gDensities;
-	FlipFlop<std::vector<real>>		gVelU;
-	FlipFlop<std::vector<real>>		gVelV;
+	FlipFlop<std::vector<real>>		gDens;
+	FlipFlop<std::vector<real>>		gVelY; // u
+	FlipFlop<std::vector<real>>		gVelX; // v
 	std::vector<NeighbourFlags>		gConnections;
 };

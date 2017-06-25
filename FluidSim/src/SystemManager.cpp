@@ -51,7 +51,7 @@ void SystemManager::Run()
 			// update dt
 			auto t2 = Tools::TimeHelp::GetTime();
 			dt = Tools::TimeHelp::DeltaTime(t, t2, Tools::TimeHelp::SECONDS);
-			//dt = 0.001f;
+			//dt = 0.01f;
 			t = t2;
 
 			gTimeAnalyse.Step(dt, sdt);
@@ -85,7 +85,9 @@ void SystemManager::Setup()
 {
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
-	gpFluidSystem->Setup({ 128, 128 });
+
+	uint32_t r = 64 * 2;
+	gpFluidSystem->Setup(r, 0.0, 0.0);
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
@@ -123,7 +125,8 @@ void SystemManager::ReadInput()
 
 	// press "R" to reset the particle system
 	if (gInputListener->IsKeyPressed('R')) {
-		//gpParticleSystem->Reset();
+		gpFluidSystem->Clear();
+		gpFluidSystem->ClearUpdaters();
 		gTimeAnalyse.Reset();
 		gRefreshVisual = true;
 	}
@@ -140,8 +143,9 @@ void SystemManager::ReadInput()
 
 	System::InputManager::AState boardState;
 	boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
- 	static std::vector<std::tuple<int, FluidFiller, std::string>> scene_key_mapping = {
-		{ 1, &FluidFillers::HalfFull, "Half full" },
+ 	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
+		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidFillers::Blower()); }, "Blower" },
+		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidFillers::Square()); }, "Square" },
  	};
 
  	for (auto entry : scene_key_mapping) {

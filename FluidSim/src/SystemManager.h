@@ -21,7 +21,7 @@ private:
 	void ReadInput();
 	void RenewRenderer();
 
-	typedef void (*FluidFiller)(FluidSystem*);
+	typedef void (*FSFunc)(FluidSystem*);
 
 	System::InputManager*	gInputListener = nullptr;
 	GLCore::GLEngine*		gpEngine = nullptr;

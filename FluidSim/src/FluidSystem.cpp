@@ -1,193 +1,217 @@
 #include "FluidSystem.h"
 
+#define ID(i,j) ((i)+(N+2)*(j))
+#define SWAP(x0,x) {float * tmp=x0;x0=x;x=tmp;}
 #define FOR_EACH_CELL for ( i=1 ; i<=N ; i++ ) { for ( j=1 ; j<=N ; j++ ) {
 #define END_FOR }}
+
+struct Kernel2Pass {
+	int w, h;
+	float* kw, kh;
+};
+
+
+// reflected indexing for border processing
+int reflect(int M, int x)
+{
+	if (x < 0)
+	{
+		return -x - 1;
+	}
+	if (x >= M)
+	{
+		return 2 * M - x - 1;
+	}
+	return x;
+}
+
+template <typename T>
+T Gauss_dist(T x, T m, T s)
+{
+	static const T inv_sqrt_2pi = 0.3989422804014327;
+	T a = (x - m) / s;
+
+	return inv_sqrt_2pi / s * std::exp(-T(0.5) * a * a);
+}
+
+void Gauss2Pass(float* src, int sx, int sy, int r) 
+{
+	// build kernel
+}
 
 
 FluidSystem::FluidSystem()
 {
 }
 
-
 FluidSystem::~FluidSystem()
 {
-
 }
 
-void FluidSystem::Setup(Tools::Surface2D<uint32_t> surface)
+void FluidSystem::Setup(int N, float diff, float visc)
 {
-	// metadata
-	gTrueSurface = surface;
-	gTrueCellCount = surface.Area();
-	gNi = surface.width - 2;
-	gInnerCellCount = gNi * gNi;
+	this->N = N;
+	this->diff = diff;
+	this->visc = visc;
 
-	// parameters
-	gDiffuse = 0.0001;
-	gViscosity = 0.9;
+	int mem_size = (N + 2) * (N + 2);
 
-	// data
-	for (int i = 0; i < 2; i++) {
-		gDens.gStates[i].resize(gTrueCellCount);
-		gVelY.gStates[i].resize(gTrueCellCount);
-		gVelX.gStates[i].resize(gTrueCellCount);
-	}
+	velX.Resize(mem_size);
+	velY.Resize(mem_size);
+	dens.Resize(mem_size);
 
-	gConnections.resize(gTrueCellCount);
-
-	// set border connections to false
-}
-
-void FluidSystem::SetDensity(int x, int y, real val)
-{
-	gDens.Curr()[ID(x, y)] = val;
-	gDens.Prev()[ID(x, y)] = val;
+	/*u = new float[mem];
+	v = new float[mem];
+	u_prev = new float[mem];
+	v_prev = new float[mem];
+	dens = new float[mem];
+	dens_prev = new float[mem];*/
 }
 
 void FluidSystem::Update(real dt)
 {
-	ForcesStep(dt);
-	VelocityStep(dt);
-	DensityStep(dt);
-	//DampStep(dt);
+	std::vector<Tools::UpdatableR<bool, FluidSystem*>*>::iterator i = gUpdaters.begin();
+	while (i != gUpdaters.end())
+	{
+		if (!(*i)->Update(this)) i = gUpdaters.erase(i);
+		else i++;
+	}
+
+	// zero out
+	Tools::Fill<real>(velX.Prev(), 0);
+	Tools::Fill<real>(velY.Prev(), 0);
+	Tools::Fill<real>(dens.Prev(), 0);
+
+	VelStep(N, velX.Curr().data(), velY.Curr().data(), velX.Prev().data(), velY.Prev().data(), visc, dt);
+	DensStep(N, dens.Curr().data(), dens.Prev().data(), velX.Curr().data(), velY.Curr().data(), diff, dt);
 }
 
-Tools::Surface2D<uint32_t> FluidSystem::GetSize()
+void FluidSystem::SetDensity(int x, int y, real val)
 {
-	return gTrueSurface;
+	dens.Curr()[ID(x, y)] = val;
+	//dens.Prev()[IX(x, y)] = val;
 }
 
-std::vector<real>& FluidSystem::GetDensities()
+void FluidSystem::SetVelocity(int x, int y, real vx, real vy)
 {
-	return gDens.gStates[gDens.gCurrID]; //.Current();
+	auto id = ID(x, y);
+	velX.Curr()[id] = vx;
+	//velX.Prev()[id] = vx;
+	velY.Curr()[id] = vy;
+	//velY.Prev()[id] = vy;
 }
 
-std::vector<real>& FluidSystem::GetVelX()
+void FluidSystem::AddUpdater(Tools::UpdatableR<bool, FluidSystem*>* pU)
 {
-	return gVelY.gStates[gVelY.gCurrID];
+	gUpdaters.push_back(pU);
 }
 
-std::vector<real>& FluidSystem::GetVelY()
+void FluidSystem::RemoveUpdater(Tools::UpdatableR<bool, FluidSystem*>* ptr, bool to_delete)
 {
-	return gVelX.gStates[gVelX.gCurrID];
+	Tools::RemoveOneReverse(gUpdaters, ptr);
+	if (to_delete) delete ptr;
 }
 
-void FluidSystem::SetZeroVelocity()
+void FluidSystem::Clear()
 {
-	for (int i = 0; i < gTrueCellCount; i++) {
-		gVelX.Curr()[i] = 0;
-		gVelX.Prev()[i] = 0;
-		gVelY.Curr()[i] = 0;
-		gVelY.Prev()[i] = 0;
+	velX.SetZero();
+	velY.SetZero();
+	dens.SetZero();
+}
+
+void FluidSystem::ClearUpdaters()
+{
+	for (auto pU : gUpdaters) {
+		delete pU;
+	}
+
+	gUpdaters.clear();
+}
+
+Tools::Surface2D<int> FluidSystem::GetSize()
+{
+	return { N+2, N+2 };
+}
+
+FluidSystem::list FluidSystem::GetDensities()
+{
+	return dens.Curr();
+}
+
+FluidSystem::list FluidSystem::GetVelX()
+{
+	return velX.Curr();
+}
+
+FluidSystem::list FluidSystem::GetVelY()
+{
+	return velY.Curr();
+}
+
+real& FluidSystem::Density(int x, int y)
+{
+	return dens.Curr()[ID(x,y)];
+}
+
+real& FluidSystem::VelX(int x, int y)
+{
+	return velX.Curr()[ID(x, y)];
+}
+
+real& FluidSystem::VelY(int x, int y)
+{
+	return velY.Curr()[ID(x, y)];
+}
+
+void FluidSystem::AddFluid(int x, int y, float d, float vx, float vy, bool speedModify)
+{
+	int id = ID(x, y);
+	// update density, and find out what part the new fluid is
+	// update velocity with this part
+	if (speedModify) {
+		real d_part = d / (dens.Curr()[id] += d);
+		real d_inv_part = 1 - d_part;
+		velX.Curr()[id] = d_inv_part * velX.Curr()[id] + d_part * vx;
+		velY.Curr()[id] = d_inv_part * velY.Curr()[id] + d_part * vy;
+	}
+	else {
+		dens.Curr()[id] += d;
+		SetVelocity(x, y, vx, vy);
 	}
 }
 
-void FluidSystem::DensityStep(real dt)
+void FluidSystem::DensStep(int N, float * x, float * x0, float * u, float * v, float diff, float dt)
 {
-	AddArrayDt(gDens.Curr(), gDens.Prev(), dt);
-
-	gDens.Swap();
-	Diffuse(0, gDens.Curr(), gDens.Prev(), gDiffuse, dt);
-
-	gDens.Swap();
-	Advect(0, gDens.Curr(), gDens.Prev(), gVelY.Curr(), gVelX.Curr(), dt);
+	// x = density
+	AddArrDt(N, x, x0, dt);
+	SWAP(x0, x);
+	Diffuse(N, 0, x, x0, diff, dt);
+	SWAP(x0, x);
+	Advect(N, 0, x, x0, u, v, dt);
 }
 
-void FluidSystem::VelocityStep(real dt)
+void FluidSystem::VelStep(int N, float * u, float * v, float * u0, float * v0, float visc, float dt)
 {
-	int N = gNi;
-
-	AddArrayDt(gVelY.Curr(), gVelY.Prev(), dt);
-	AddArrayDt(gVelX.Curr(), gVelX.Prev(), dt);
-	gVelY.Swap();
-	Diffuse(1, gVelY.Curr(), gVelY.Prev(), gViscosity, dt);
-	gVelX.Swap();
-	Diffuse(1, gVelX.Curr(), gVelX.Prev(), gViscosity, dt);
-	Project(gVelY.Curr(), gVelX.Curr(), gVelY.Prev(), gVelX.Prev());
-	gVelY.Swap();
-	gVelX.Swap();
-	Advect(1, gVelY.Curr(), gVelY.Prev(), gVelY.Prev(), gVelX.Prev(), dt);
-	Advect(1, gVelX.Curr(), gVelX.Prev(), gVelY.Prev(), gVelX.Prev(), dt);
-	Project(gVelY.Curr(), gVelX.Prev(), gVelY.Prev(), gVelX.Prev());
-
-	/*
-	add_source(N, u(), u0(), dt); add_source(N, v(), v0(), dt);
-	gVel_x.Swap(); diffuse(N, 1, u(), u0(), visc(), dt);
-	gVel_y.Swap(); diffuse(N, 2, v(), v0(), visc(), dt);
-	project(N, u(), v(), u0(), v0());
-	gVel_x.Swap(); gVel_y.Swap();
-	advect(N, 1, u(), u0(), u0(), v0(), dt); advect(N, 2, v(), v0(), u0(), v0(), dt);
-	project(N, u(), v(), u0(), v0());
-	*/
+	AddArrDt(N, u, u0, dt); AddArrDt(N, v, v0, dt);
+	SWAP(u0, u); Diffuse(N, 1, u, u0, visc, dt);
+	SWAP(v0, v); Diffuse(N, 2, v, v0, visc, dt);
+	Project(N, u, v, u0, v0);
+	SWAP(u0, u); SWAP(v0, v);
+	Advect(N, 1, u, u0, u0, v0, dt); Advect(N, 2, v, v0, u0, v0, dt);
+	Project(N, u, v, u0, v0);
 }
 
-void FluidSystem::ForcesStep(real dt)
+
+
+void FluidSystem::AddArrDt(int N, float * x, float * s, float dt)
 {
-	list u = gVelY.Curr();
-	list v = gVelX.Curr();
-
-	for (int i = 0; i < gTrueCellCount; i++) {
-		//u[i] -= dt * 1.0;
-		v[i] -= dt * 1.0;
-	}
+	int i, size = (N + 2)*(N + 2);
+	for (i = 0; i < size; i++) x[i] += dt*s[i];
 }
 
-void FluidSystem::DampStep(real dt)
-{
-	list vx = gVelY.Curr();
-	list vy = gVelX.Curr();
-	for (int i = 0; i < gTrueCellCount; i++) {
-		//real my = (v[i] * v[i]) * 10;
-		//real mx = (u[i] * u[i]) * 10;
-		vy[i] *= powf(0.95, dt);// / (1 + dt * mx);
-		vx[i] *= powf(0.95, dt);// / (1 + dt * my);
-	}
-}
-
-void FluidSystem::Diffuse(int b, list x, list x0, real strength, real dt)
-{
-	float a = dt * gDiffuse * gInnerCellCount;
-	LinearSolve(b, x, x0, a, 1 + 4 * a);
-}
-
-void FluidSystem::Advect(int b, list d, list d0, list u, list v, real dt)
-{
-	// TODO: make compatible with width/height
-
-	int i, j, i0, j0, i1, j1;
-	float x, y, s0, t0, s1, t1, dt0;
-	int N = gNi;
-	dt0 = dt*N;
-	for (i = 1; i <= N; i++) {
-		for (j = 1; j <= N; j++) {
-			x = i - dt0*u[IX(i, j)]; y = j - dt0*v[IX(i, j)];
-			if (x < 0.5f) x = 0.5f; if (x > N + 0.5f) x = N + 0.5f; i0 = (int) x; i1 = i0 + 1;
-			if (y < 0.5f) y = 0.5f; if (y > N + 0.5f) y = N + 0.5f; j0 = (int) y; j1 = j0 + 1;
-			s1 = x - i0; s0 = 1 - s1; t1 = y - j0; t0 = 1 - t1;
-			d[IX(i, j)] = s0*(t0*d0[IX(i0, j0)] + t1*d0[IX(i0, j1)]) +
-				s1*(t0*d0[IX(i1, j0)] + t1*d0[IX(i1, j1)]);
-		}
-	}
-	SetBorder(b, d);
-}
-
-void FluidSystem::LinearSolve(int b, list x, list x0, real a, real c) {
-	int i, j, k;
-	int N = gNi;
-	for (k = 0; k < 20; k++) {
-		for (i = 1; i <= N; i++) {
-			for (j = 1; j <= N; j++) {
-				x[IX(i, j)] = (x0[IX(i, j)] + a*(x[IX(i - 1, j)] + x[IX(i + 1, j)] + x[IX(i, j - 1)] + x[IX(i, j + 1)])) / c;
-			}
-		}
-		SetBorder(b, x);
-	}
-}
-
-void FluidSystem::SetBorder(int b, list x)
+void FluidSystem::SetBorder(int N, int b, float * x)
 {
 	int i;
-	int N = gNi;
 
 	// sides
 	for (i = 1; i <= N; i++) {
@@ -204,36 +228,66 @@ void FluidSystem::SetBorder(int b, list x)
 	x[ID(N + 1, N + 1)] = 0.5f*(x[ID(N, N + 1)] + x[ID(N + 1, N)]);
 }
 
-void FluidSystem::Project(list u, list v, list p, list div)
+void FluidSystem::LinearSolve(int N, int b, float * x, float * x0, float a, float c)
 {
-	int N = gNi;
-	int i, j;
+	int i, j, k;
 
-	for (i = 1; i <= N; i++) {
-		for (j = 1; j <= N; j++) {
-			div[IX(i, j)] = -0.5f*(u[IX(i + 1, j)] - u[IX(i - 1, j)] + v[IX(i, j + 1)] - v[IX(i, j - 1)]) / N;
-			p[IX(i, j)] = 0;
+
+	if (a > 0) {
+		for (k = 0; k < 20; k++) {
+			FOR_EACH_CELL
+				x[ID(i, j)] = (x0[ID(i, j)] + a*(x[ID(i - 1, j)] + x[ID(i + 1, j)] + x[ID(i, j - 1)] + x[ID(i, j + 1)])) / c;
+			END_FOR
+				SetBorder(N, b, x);
 		}
 	}
-
-	SetBorder(0, div); 
-	SetBorder(0, p);
-
-	LinearSolve(0, p, div, 1, 4);
-
-	for (i = 1; i <= N; i++) {
-		for (j = 1; j <= N; j++) {
-			u[IX(i, j)] -= 0.5f*N*(p[IX(i + 1, j)] - p[IX(i - 1, j)]);
-			v[IX(i, j)] -= 0.5f*N*(p[IX(i, j + 1)] - p[IX(i, j - 1)]);
-		}
+	else {
+		FOR_EACH_CELL
+			x[ID(i, j)] = x0[ID(i, j)];
+		END_FOR
+		SetBorder(N, b, x);
 	}
-
-	SetBorder(1, u); 
-	SetBorder(2, v);
+	
 }
 
-void FluidSystem::AddArrayDt(list x, list s, real dt)
+void FluidSystem::Diffuse(int N, int b, float * x, float * x0, float diff, float dt)
 {
-	for (int i = 0; i < gTrueCellCount; i++)
-		x[i] += dt*s[i];
+	float a = dt*diff*N*N;
+	LinearSolve(N, b, x, x0, a, 1 + 4 * a);
+}
+
+void FluidSystem::Advect(int N, int b, float * d, float * d0, float * u, float * v, float dt)
+{
+	int i, j, i0, j0, i1, j1;
+	float x, y, s0, t0, s1, t1, dt0;
+
+	dt0 = dt*N;
+	FOR_EACH_CELL
+		x = i - dt0*u[ID(i, j)]; y = j - dt0*v[ID(i, j)];
+	if (x < 0.5f) x = 0.5f; if (x > N + 0.5f) x = N + 0.5f; i0 = (int) x; i1 = i0 + 1;
+	if (y < 0.5f) y = 0.5f; if (y > N + 0.5f) y = N + 0.5f; j0 = (int) y; j1 = j0 + 1;
+	s1 = x - i0; s0 = 1 - s1; t1 = y - j0; t0 = 1 - t1;
+	d[ID(i, j)] = s0*(t0*d0[ID(i0, j0)] + t1*d0[ID(i0, j1)]) +
+		s1*(t0*d0[ID(i1, j0)] + t1*d0[ID(i1, j1)]);
+	END_FOR
+		SetBorder(N, b, d);
+}
+
+void FluidSystem::Project(int N, float * u, float * v, float * p, float * div)
+{
+	int i, j;
+
+	FOR_EACH_CELL
+		div[ID(i, j)] = -0.5f*(u[ID(i + 1, j)] - u[ID(i - 1, j)] + v[ID(i, j + 1)] - v[ID(i, j - 1)]) / N;
+	p[ID(i, j)] = 0;
+	END_FOR
+		SetBorder(N, 0, div); SetBorder(N, 0, p);
+
+	LinearSolve(N, 0, p, div, 1, 4);
+
+	FOR_EACH_CELL
+		u[ID(i, j)] -= 0.5f*N*(p[ID(i + 1, j)] - p[ID(i - 1, j)]);
+	v[ID(i, j)] -= 0.5f*N*(p[ID(i, j + 1)] - p[ID(i, j - 1)]);
+	END_FOR
+		SetBorder(N, 1, u); SetBorder(N, 2, v);
 }

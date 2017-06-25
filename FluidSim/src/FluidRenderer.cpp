@@ -47,7 +47,7 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 	if (gpFluidSystem) {
 		rc.pState->BindTexture(gFluidTexID);
 		auto surface = gpFluidSystem->GetSize();
-		uint32_t pixel_count = surface.Area();
+		int pixel_count = surface.Area();
 		gPixels.resize(pixel_count * 3);
 		auto& density = gpFluidSystem->GetDensities();
 		auto& vel_x = gpFluidSystem->GetVelX();
@@ -56,15 +56,14 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 			real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
 			real dens = density[i];
 			real value = speed;
-			gPixels[i * 3 + 0] = speed;
-			gPixels[i * 3 + 1] = dens;
-			gPixels[i * 3 + 2] = dens;
+			gPixels[i * 3 + 0] = dens;
+			gPixels[i * 3 + 1] = dens;//dens * 0.1;
+			gPixels[i * 3 + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
 		//std::cout << data[i] << ", ";
 		} // TODO : normalize?
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface.width, surface.height, 0, GL_RGB, GL_FLOAT, gPixels.data());
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 	}
 }
 
@@ -93,10 +92,8 @@ void ImageShader::Prepare(GLCore::RendererContext rc)
 {
 	if (gImgID != (GLuint) -1) {
 		rc.pState->UseProgram(Shader::programID);
-		GLCheck(__LINE__);
 		rc.pState->ActivateTextureSlot(0);
 		rc.pState->BindTexture(gImgID);
-		GLCheck(__LINE__);
 	}
 }
 

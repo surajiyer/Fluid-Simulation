@@ -5,41 +5,6 @@
 #define FOR_EACH_CELL for ( i=1 ; i<=N ; i++ ) { for ( j=1 ; j<=N ; j++ ) {
 #define END_FOR }}
 
-struct Kernel2Pass {
-	int w, h;
-	float* kw, kh;
-};
-
-
-// reflected indexing for border processing
-int reflect(int M, int x)
-{
-	if (x < 0)
-	{
-		return -x - 1;
-	}
-	if (x >= M)
-	{
-		return 2 * M - x - 1;
-	}
-	return x;
-}
-
-template <typename T>
-T Gauss_dist(T x, T m, T s)
-{
-	static const T inv_sqrt_2pi = 0.3989422804014327;
-	T a = (x - m) / s;
-
-	return inv_sqrt_2pi / s * std::exp(-T(0.5) * a * a);
-}
-
-void Gauss2Pass(float* src, int sx, int sy, int r) 
-{
-	// build kernel
-}
-
-
 FluidSystem::FluidSystem()
 {
 }
@@ -70,10 +35,12 @@ void FluidSystem::Setup(int N, float diff, float visc)
 
 void FluidSystem::Update(real dt)
 {
-	std::vector<Tools::UpdatableR<bool, FluidSystem*>*>::iterator i = gUpdaters.begin();
+	FluidUpdate fu { this, dt };
+
+	std::vector<Tools::UpdatableR<bool, FluidUpdate>*>::iterator i = gUpdaters.begin();
 	while (i != gUpdaters.end())
 	{
-		if (!(*i)->Update(this)) i = gUpdaters.erase(i);
+		if (!(*i)->Update(fu)) i = gUpdaters.erase(i);
 		else i++;
 	}
 
@@ -101,12 +68,12 @@ void FluidSystem::SetVelocity(int x, int y, real vx, real vy)
 	//velY.Prev()[id] = vy;
 }
 
-void FluidSystem::AddUpdater(Tools::UpdatableR<bool, FluidSystem*>* pU)
+void FluidSystem::AddUpdater(Tools::UpdatableR<bool, FluidUpdate>* pU)
 {
 	gUpdaters.push_back(pU);
 }
 
-void FluidSystem::RemoveUpdater(Tools::UpdatableR<bool, FluidSystem*>* ptr, bool to_delete)
+void FluidSystem::RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>* ptr, bool to_delete)
 {
 	Tools::RemoveOneReverse(gUpdaters, ptr);
 	if (to_delete) delete ptr;
@@ -131,6 +98,11 @@ void FluidSystem::ClearUpdaters()
 Tools::Surface2D<int> FluidSystem::GetSize()
 {
 	return { N+2, N+2 };
+}
+
+int FluidSystem::GetN_inner()
+{
+	return N;
 }
 
 FluidSystem::list FluidSystem::GetDensities()
@@ -231,7 +203,6 @@ void FluidSystem::SetBorder(int N, int b, float * x)
 void FluidSystem::LinearSolve(int N, int b, float * x, float * x0, float a, float c)
 {
 	int i, j, k;
-
 
 	if (a > 0) {
 		for (k = 0; k < 20; k++) {

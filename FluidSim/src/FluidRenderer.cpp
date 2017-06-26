@@ -34,6 +34,10 @@ void FluidRenderer::Execute(GLCore::RendererContext rc)
 	glGenTextures(1, &texID);
 	rc.pState->BindTexture(texID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 64, 64, 0, GL_RGB, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	gFluidTexID = texID;
 
@@ -56,14 +60,12 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 			real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
 			real dens = density[i];
 			real value = speed;
-			gPixels[i * 3 + 0] = dens;
+			gPixels[i * 3 + 0] = speed;
 			gPixels[i * 3 + 1] = dens;//dens * 0.1;
 			gPixels[i * 3 + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
 		//std::cout << data[i] << ", ";
 		} // TODO : normalize?
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface.width, surface.height, 0, GL_RGB, GL_FLOAT, gPixels.data());
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	}
 }
 

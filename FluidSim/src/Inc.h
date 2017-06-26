@@ -14,7 +14,8 @@ using MatX = Eigen::Matrix<real, Eigen::Dynamic, Eigen::Dynamic>;
 // forward declarations:
 class FluidSystem;
 class FluidRenderer;
+class FluidInteraction;
 
-namespace FluidFillers{
+namespace FluidUpdaters{
 class FluidGen;
 }

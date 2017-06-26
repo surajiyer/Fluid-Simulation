@@ -19,14 +19,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\FluidFillers.h" />
+    <ClInclude Include="src\FluidInteraction.h" />
+    <ClInclude Include="src\FluidUpdaters.h" />
     <ClInclude Include="src\FluidRenderer.h" />
     <ClInclude Include="src\FluidSystem.h" />
     <ClInclude Include="src\Inc.h" />
     <ClInclude Include="src\SystemManager.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\FluidFillers.cpp" />
+    <ClCompile Include="src\FluidInteraction.cpp" />
+    <ClCompile Include="src\FluidUpdaters.cpp" />
     <ClCompile Include="src\FluidRenderer.cpp" />
     <ClCompile Include="src\FluidSystem.cpp" />
     <ClCompile Include="src\main.cpp" />

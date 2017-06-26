@@ -19,7 +19,6 @@ private:
 	void Setup();
 	void Update(float dt);
 	void ReadInput();
-	void RenewRenderer();
 
 	typedef void (*FSFunc)(FluidSystem*);
 
@@ -29,8 +28,9 @@ private:
 	bool					gSimulationEnabled = false;
 	bool					gRefreshVisual = true;
 
-	FluidSystem*			gpFluidSystem;
+	FluidSystem*			gpFluidSystem = nullptr;
 	FluidRenderer*			gpFluidRenderer = nullptr;
+	FluidInteraction*		gpFluidInteraction = nullptr;
 
 	struct TimeAnalyse {
 	public:

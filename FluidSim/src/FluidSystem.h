@@ -1,6 +1,11 @@
 #pragma once
 #include "Inc.h"
 
+struct FluidUpdate {
+	FluidSystem* fs;
+	real dt;
+};
+
 class FluidSystem
 {
 	using list = std::vector<real>&;
@@ -15,13 +20,14 @@ public:
 	void SetDensity(int x, int y, real v);
 	void SetVelocity(int x, int y, real vx, real vy);
 
-	void AddUpdater(Tools::UpdatableR<bool, FluidSystem*>*);
-	void RemoveUpdater(Tools::UpdatableR<bool, FluidSystem*>*, bool to_delete);
+	void AddUpdater(Tools::UpdatableR<bool, FluidUpdate>*);
+	void RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>*, bool to_delete);
 
 	void Clear();
 	void ClearUpdaters();
 
 	Tools::Surface2D<int> GetSize();
+	int GetN_inner();
 	list GetDensities();
 	list GetVelX();
 	list GetVelY();
@@ -82,5 +88,5 @@ public:
 	FlipFlopArr<real> velY;
 	FlipFlopArr<real> dens;
 
-	std::vector<Tools::UpdatableR<bool, FluidSystem*>*> gUpdaters;
+	std::vector<Tools::UpdatableR<bool, FluidUpdate>*> gUpdaters;
 };

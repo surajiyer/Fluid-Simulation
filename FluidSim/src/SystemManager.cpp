@@ -1,7 +1,8 @@
 #include "SystemManager.h"
 #include "FluidSystem.h"
 #include "FluidRenderer.h"
-#include "FluidFillers.h"
+#include "FluidUpdaters.h"
+#include "FluidInteraction.h"
 
 #include <Tools/Include.h>
 #include <WindowWin32/InputManager_get.h>
@@ -86,16 +87,20 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	uint32_t r = 64 * 2;
-	gpFluidSystem->Setup(r, 0.0, 0.0);
+	uint32_t r = 64 * 4;
+	real diff = 0.000001;
+	real visc = 0.000001;
+	gpFluidSystem->Setup(r, diff, visc);
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
-		gpEngine->BootInfo().window_info.windowedPrefResolution = {600, 600};
+		gpEngine->BootInfo().window_info.windowedPrefResolution = {800, 800};
 		gpEngine->RunAsync();	
 		gpFluidRenderer = new FluidRenderer(gpEngine);
 		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
-	}
+		gpFluidInteraction = new FluidInteraction(gpEngine->GetWindow()->GetInputManager(), gpEngine->GetWindow(), gpFluidRenderer);
+		gpFluidSystem->AddUpdater(gpFluidInteraction);
+	}	
 }
 
 void SystemManager::Update(float dt)
@@ -126,7 +131,9 @@ void SystemManager::ReadInput()
 	// press "R" to reset the particle system
 	if (gInputListener->IsKeyPressed('R')) {
 		gpFluidSystem->Clear();
+		Tools::RemoveOneVal(gpFluidSystem->gUpdaters, (Tools::UpdatableR<bool, FluidUpdate>*) gpFluidInteraction);
 		gpFluidSystem->ClearUpdaters();
+		gpFluidSystem->AddUpdater(gpFluidInteraction);
 		gTimeAnalyse.Reset();
 		gRefreshVisual = true;
 	}
@@ -144,8 +151,9 @@ void SystemManager::ReadInput()
 	System::InputManager::AState boardState;
 	boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
  	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
-		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidFillers::Blower()); }, "Blower" },
-		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidFillers::Square()); }, "Square" },
+		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower()); }, "Blower" },
+		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Square()); }, "Square" },
+		{ 3, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Gravity()); }, "Gravity" },
  	};
 
  	for (auto entry : scene_key_mapping) {

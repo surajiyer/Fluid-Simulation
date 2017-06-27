@@ -2,6 +2,7 @@
 #include <GLCore/glengine.h>
 #include <GLBase/Environment/Scene.h>
 #include <FluidSystem.h>
+#include <Tools/Math.h>
 
 void GLCheck(int line) {
 	GLenum err;
@@ -16,6 +17,11 @@ FluidRenderer::FluidRenderer(GLCore::GLEngine* pEngine)
 		gpImageShader = new ImageShader();
 		pEngine->AddTask(gpImageShader);
 	}
+
+	if (!gpLineShader) {
+		gpLineShader = new LineShader();
+		pEngine->AddTask(gpLineShader);
+	}
 	pEngine->AddTask(this);
 }
 
@@ -28,28 +34,72 @@ void FluidRenderer::SetFluidSystem(FluidSystem* pFluidSystem)
 	gpFluidSystem = pFluidSystem;
 }
 
+bool FluidRenderer::DoBuffer()
+{
+	if (gpFluidSystem == nullptr) {
+		return false;
+	}
+
+	uint32_t maxElements = gpFluidSystem->GetSize().Area();
+
+	int position_el_count = points_per_obj * linepos_vsize * maxElements;
+	gLinePositions.resize(position_el_count);
+
+	// copy positions:
+	//part_lock.lock();
+	//line_lock.lock();
+	//part_lock.unlock();
+
+	// copy lines
+	int N2 = gpFluidSystem->GetSize().width;
+
+	for (int i = 0; i < maxElements; i++) {
+		int start_linepos = points_per_obj * linepos_vsize * i;
+
+		auto xy = gpFluidSystem->rID(i);
+		auto velX = gpFluidSystem->VelX(xy.x, xy.y);
+		auto velY = gpFluidSystem->VelY(xy.x, xy.y);
+		
+		float mag = sqrt(velX * velX + velY * velY); //Tools::Math::Abs(velX) + Tools::Math::Abs(velY);
+
+		float vx = velX / mag / (N2*1.1);
+		float vy = velY / mag / (N2*1.1);
+
+		if (mag < 0.0000001) {
+			vx = vy = 0;
+		}
+
+		float lx, ly;
+		lx = (xy.x + 0.5) / (float) N2;
+		ly = (xy.y + 0.5) / (float) N2;
+
+		gLinePositions[start_linepos + 0] = lx;
+		gLinePositions[start_linepos + 1] = ly;
+		gLinePositions[start_linepos + 2] = lx + vx;
+		gLinePositions[start_linepos + 3] = ly + vy;
+	}
+
+	//line_lock.unlock();
+
+	return true;
+}
+
 void FluidRenderer::Execute(GLCore::RendererContext rc)
 {
-	GLuint texID;
-	glGenTextures(1, &texID);
-	rc.pState->BindTexture(texID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 64, 64, 0, GL_RGB, GL_FLOAT, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	gFluidTexID = texID;
+	SetupImages(rc);
+	SetupLines(rc);
 
 	rc.pState->SetClearColor(0.1, 0.1, 0.1, 1);
 	rc.pScene->AddUpdatable(this);
 	rc.pScene->AddRenderable(this);
+
 }
 
 void FluidRenderer::Update(GLCore::RendererContext rc)
 {
 	if (gpFluidSystem) {
-		rc.pState->BindTexture(gFluidTexID);
+		//rc.pState->BindTexture(gFluidTexID);
+		glBindTexture(GL_TEXTURE_2D, gFluidTexID);
 		auto surface = gpFluidSystem->GetSize();
 		int pixel_count = surface.Area();
 		gPixels.resize(pixel_count * 3);
@@ -60,7 +110,7 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 			real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
 			real dens = density[i];
 			real value = speed;
-			gPixels[i * 3 + 0] = speed;
+			gPixels[i * 3 + 0] = dens;// abs(vel_x[i]); abs(vel_y[i]);
 			gPixels[i * 3 + 1] = dens;//dens * 0.1;
 			gPixels[i * 3 + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
 		//std::cout << data[i] << ", ";
@@ -72,12 +122,152 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 void FluidRenderer::Render(GLCore::RendererContext rc)
 {
 	if (gpImageShader->IsReady()) {
-		rc.pState->SetDepthTest(false);
-		rc.pState->SetCulling(false);
-		gpImageShader->Prepare(rc);
-		gpImageShader->SetIMG(gFluidTexID);
-		rc.pEngine->GetShaderManager()->Support().drawFSQ();
+
+		glEnable(GL_BLEND);		
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		
+		if (gRenderImg) RenderImage(rc);
+		if (gRenderLine) RenderLines(rc);
 	}
+}
+
+void FluidRenderer::SetupLines(GLCore::RendererContext rc)
+{
+	uint32_t maxElements = gpFluidSystem->GetSize().Area();
+
+	// single data
+
+	glGenBuffers(1, &gLinePosBufferID);
+	glBindBuffer(GL_ARRAY_BUFFER, gLinePosBufferID);
+	glBufferData(GL_ARRAY_BUFFER, points_per_obj * maxElements * linepos_vsize * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+
+	// instance data:
+
+	glGenBuffers(1, &gLineColorBufferID);
+	glBindBuffer(GL_ARRAY_BUFFER, gLineColorBufferID);
+	glBufferData(GL_ARRAY_BUFFER, points_per_obj * maxElements * linecol_vsize * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+}
+
+void FluidRenderer::SetupImages(GLCore::RendererContext rc)
+{
+	GLuint texID;
+	glGenTextures(1, &texID);
+	//rc.pState->BindTexture(texID);
+	glBindTexture(GL_TEXTURE_2D, texID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 64, 64, 0, GL_RGB, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	gFluidTexID = texID;
+}
+
+void Grad(float* color, float mag)
+{
+	mag = Tools::Clamp<float>(mag, 0, 1);
+	color[0] = (mag);
+	color[1] = 0;
+	color[2] = (1.f - mag);
+}
+
+void FluidRenderer::RenderLines(GLCore::RendererContext rc)
+{
+	gpLineShader->Prepare(rc);
+
+	uint32_t maxObjects = gpFluidSystem->GetSize().Area();
+
+	int position_el_count = points_per_obj * linepos_vsize * maxObjects;
+
+	int colors_el_count = points_per_obj * linecol_vsize * maxObjects;
+	gLineColors.resize(colors_el_count);
+
+	float color_l1[] = { 0, 1, 0, 1 };
+	float color_l2[] = { 0, 1, 0, 1 };
+
+	int N2 = gpFluidSystem->GetSize().width;
+	int step = points_per_obj * linecol_vsize;
+	for (int i = 0; i < maxObjects; i ++) {
+
+		auto xy = gpFluidSystem->rID(i);
+		auto velX = gpFluidSystem->VelX(xy.x, xy.y);
+		auto velY = gpFluidSystem->VelY(xy.x, xy.y);
+
+		float mag = sqrt(velX * velX + velY * velY); //Tools::Math::Abs(velX) + Tools::Math::Abs(velY);
+
+		color_l1[3] = 1;// 0.5 + mag * 0.5;
+		color_l2[3] = 1;// 0.5 + mag * 0.5;
+
+		Grad(color_l1, mag);
+		Grad(color_l2, mag);
+
+		for (int j = 0; j < 4; j++) {
+			gLineColors[i * step + j] = color_l1[j];
+		}
+		for (int j = 0; j < 4; j++) {
+			gLineColors[i * step + j + 4] = j == 3 ? 0.5 : color_l2[j];
+		}
+	}
+
+	//Tools::Fill(gLineColors, (float) 1);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, gLinePosBufferID);
+	glBufferData(GL_ARRAY_BUFFER, position_el_count * sizeof(GLfloat), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
+	glBufferSubData(GL_ARRAY_BUFFER, 0, position_el_count * sizeof(GLfloat), gLinePositions.data());
+
+	glBindBuffer(GL_ARRAY_BUFFER, gLineColorBufferID);
+	glBufferData(GL_ARRAY_BUFFER, colors_el_count * sizeof(GLfloat), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
+	glBufferSubData(GL_ARRAY_BUFFER, 0, colors_el_count * sizeof(GLfloat), gLineColors.data());
+
+	// 1rst attribute buffer : locations
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, gLinePosBufferID);
+	glVertexAttribPointer(
+		0, // attribute. No particular reason for 0, but must match the layout in the shader.
+		linepos_vsize, // size
+		GL_FLOAT, // type
+		GL_FALSE, // normalized?
+		0, // stride
+		(void*) 0 // array buffer offset
+	);
+
+	// 2nd attribute buffer : colors
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, gLineColorBufferID);
+	glVertexAttribPointer(
+		1, // attribute. No particular reason for 1, but must match the layout in the shader.
+		linecol_vsize, // size : x + y + z + size => 4
+		GL_FLOAT, // type
+		GL_FALSE, // normalized?
+		0, // stride
+		(void*) 0 // array buffer offset
+	);
+
+	glDisableVertexAttribArray(2);
+
+	glVertexAttribDivisor(0, 0); // line points
+	glVertexAttribDivisor(1, 0); // colors
+
+	glDrawArrays(GL_LINES, 0, maxObjects * points_per_obj);
+}
+
+bool& FluidRenderer::RenderLines()
+{
+	return gRenderLine;
+}
+
+bool& FluidRenderer::RenderImg()
+{
+	return gRenderImg;
+}
+
+void FluidRenderer::RenderImage(GLCore::RendererContext rc)
+{
+	rc.pState->SetDepthTest(false);
+	rc.pState->SetCulling(false);
+	gpImageShader->Prepare(rc);
+	gpImageShader->SetIMG(gFluidTexID);
+	rc.pEngine->GetShaderManager()->Support().drawFSQ();
 }
 
 ImageShader::ImageShader()
@@ -95,7 +285,8 @@ void ImageShader::Prepare(GLCore::RendererContext rc)
 	if (gImgID != (GLuint) -1) {
 		rc.pState->UseProgram(Shader::programID);
 		rc.pState->ActivateTextureSlot(0);
-		rc.pState->BindTexture(gImgID);
+		//rc.pState->BindTexture(gImgID);
+		glBindTexture(GL_TEXTURE_2D, gImgID);
 	}
 }
 
@@ -115,5 +306,24 @@ void ImageShader::Execute(GLCore::RendererContext rc)
 {
 	auto shaderManager = rc.pEngine->GetShaderManager();
 	Shader::programID = shaderManager->LoadShader("img_shader", "img_shader", nullptr);
+	shaderManager->Register(this);
+}
+
+void LineShader::Prepare(GLCore::RendererContext rc)
+{
+	rc.pState->UseProgram(Shader::programID);
+}
+
+void LineShader::Update(GLCore::RendererContext rc)
+{
+	rc.pState->UseProgram(Shader::programID);
+	// update frame based variables.. (camera position)
+	// glUniformMatrix4fv(0, 1, FALSE, rc.pScene->GetActiveCamera()->getVPMatrix().data());
+}
+
+void LineShader::Execute(GLCore::RendererContext rc)
+{
+	auto shaderManager = rc.pEngine->GetShaderManager();
+	Shader::programID = shaderManager->LoadShader("ss_instanced_color_line", "ss_instanced_color_line", nullptr);
 	shaderManager->Register(this);
 }

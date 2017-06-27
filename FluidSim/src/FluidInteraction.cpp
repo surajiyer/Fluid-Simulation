@@ -26,27 +26,29 @@ bool FluidInteraction::ObjectResized(void* pCaller, Surface2D<int> newSize)
 
 bool FluidInteraction::Update(FluidUpdate fu)
 {
-	int i, j;
-	int N = fu.fs->GetN_inner();
+	if (fu.type == FluidUpdate::VEL) {
+		int i, j;
+		int N = fu.fs->GetN_inner();
 
-	if (!m_down) return true;
+		if (!m_down) return true;
 
-	i = (int) ((mx / (float) gSurface.width)*N + 1);
-	j = (int) (((gSurface.height - my) / (float) gSurface.width)*N + 1);
+		i = (int) ((mx / (float) gSurface.width)*N + 1);
+		j = (int) (((gSurface.height - my) / (float) gSurface.width)*N + 1);
 
-	if (i<1 || i>N || j<1 || j>N) return true;
+		if (i<1 || i>N || j<1 || j>N) return true;
 
-	if (m_down) {
-		fu.fs->VelX(i, j) = force * (mx - omx);
-		fu.fs->VelY(i, j) = force * (omy - my);
+		if (m_down) {
+			fu.fs->VelX(i, j) = force * (mx - omx);
+			fu.fs->VelY(i, j) = force * (omy - my);
+		}
+
+		//if (m_down) {
+		//	fu.fs->Density(i, j) = source;
+		//}
+
+		omx = mx;
+		omy = my;
 	}
-
-	//if (m_down) {
-	//	fu.fs->Density(i, j) = source;
-	//}
-
-	omx = mx;
-	omy = my;
 
 	return true;
 }

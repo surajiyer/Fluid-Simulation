@@ -62,15 +62,15 @@ void SystemManager::Run()
 				<< " \tMax. " << 1000 * gTimeAnalyse.dt_max;
 
 			gRefreshVisual = true;
-			//if (gEnableRender && gpParticleRenderer) gpParticleRenderer->DoBuffer();
+			if (gEnableRender && gpFluidRenderer) gpFluidRenderer->DoBuffer();
 		}
 		else {
-// 			if (gRefreshVisual && gEnableRender && gpParticleRenderer) {
-// 				gpParticleSystem->RecalculateForces(); // for visualization
-// 				if (gpParticleRenderer->DoBuffer()) {
-// 					gRefreshVisual = false;
-// 				}
-// 			}
+ 			if (gRefreshVisual && gEnableRender && gpFluidRenderer) {
+ 				//gpFluidSystem->RecalculateForces(); // for visualization
+ 				if (gpFluidRenderer->DoBuffer()) {
+ 					gRefreshVisual = false;
+ 				}
+ 			}
 
 			t = Tools::TimeHelp::GetTime();
 		}
@@ -87,14 +87,14 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	uint32_t r = 64 * 4;
-	real diff = 0.000001;
-	real visc = 0.000001;
+	uint32_t r = 64 * 1;
+	real diff = 0.000000;
+	real visc = 0.000000;
 	gpFluidSystem->Setup(r, diff, visc);
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
-		gpEngine->BootInfo().window_info.windowedPrefResolution = {800, 800};
+		gpEngine->BootInfo().window_info.windowedPrefResolution = {600, 600};
 		gpEngine->RunAsync();	
 		gpFluidRenderer = new FluidRenderer(gpEngine);
 		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
@@ -136,6 +136,20 @@ void SystemManager::ReadInput()
 		gpFluidSystem->AddUpdater(gpFluidInteraction);
 		gTimeAnalyse.Reset();
 		gRefreshVisual = true;
+	}
+
+	if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Fkey(1))) {
+		if (gpFluidRenderer->RenderLines() && gpFluidRenderer->RenderImg()) {
+			gpFluidRenderer->RenderLines() = false;
+		}
+		else if (gpFluidRenderer->RenderImg()) {
+			gpFluidRenderer->RenderImg() = false;
+			gpFluidRenderer->RenderLines() = true;
+		}
+		else {
+			gpFluidRenderer->RenderImg() = true;
+			gpFluidRenderer->RenderLines() = true;
+		}
 	}
 
 	// 	static std::vector<std::tuple<int, SolveFunc, std::string>> solver_key_mapping = {

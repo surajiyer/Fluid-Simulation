@@ -2,8 +2,12 @@
 #include "Inc.h"
 
 struct FluidUpdate {
+	enum Type {
+		VEL, DENS
+	};
 	FluidSystem* fs;
 	real dt;
+	Type type;
 };
 
 class FluidSystem
@@ -38,6 +42,14 @@ public:
 
 	void AddFluid(int x, int y, float d, float vx, float vy, bool speedModify = true);
 
+	__forceinline int ID(int i, int j) {
+		return i + (N + 2) * j;
+	}
+
+	__forceinline Tools::Point2D<int> rID(int i) {
+		return {i % (N + 2), (int)(i / (N + 2)) };
+	}
+
 private:
 	//typedef real S;
 	template<class S>
@@ -57,7 +69,7 @@ private:
 
 		inline void Swap() {
 			gPrevID = gCurrID;
-			gCurrID = gCurrID ^ 1; // xor
+			gCurrID ^= 1; // xor
 		}
 
 		inline void Resize(int n) {
@@ -71,21 +83,23 @@ private:
 		}
 	};
 
-	void DensStep(int N, float * x, float * x0, float * u, float * v, float diff, float dt);
-	void VelStep(int N, float * u, float * v, float * u0, float * v0, float visc, float dt);
-	void AddArrDt(int N, float * x, float * s, float dt);
-	void SetBorder(int N, int b, float * x);
-	void LinearSolve(int N, int b, float * x, float * x0, float a, float c);
-	void Diffuse(int N, int b, float * x, float * x0, float diff, float dt);
-	void Advect(int N, int b, float * d, float * d0, float * u, float * v, float dt);
-	void Project(int N, float * u, float * v, float * p, float * div);
+	void CallUpdates(real dt, FluidUpdate::Type);
+
+	void DensStep(float dt);
+	void VelStep(float dt);
+	void AddArrDt(int N, list x, list s, float dt);
+	void SetBorder(int N, int b, list x);
+	void LinearSolve(int N, int b, list x, list x0, float a, float c);
+	void Diffuse(int N, int b, list x, list x0, float diff, float dt);
+	void Advect(int N, int b, list d, list d0, list u, list v, float dt);
+	void Project(int N, list u, list v, list p, list div);
 
 public:
 	int N;
 	real diff, visc;
 
-	FlipFlopArr<real> velX;
-	FlipFlopArr<real> velY;
+	FlipFlopArr<real> vX;
+	FlipFlopArr<real> vY;
 	FlipFlopArr<real> dens;
 
 	std::vector<Tools::UpdatableR<bool, FluidUpdate>*> gUpdaters;

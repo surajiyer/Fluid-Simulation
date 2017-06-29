@@ -44,7 +44,7 @@ void SystemManager::Run()
 		// update
 		if (gSimulationEnabled || gInputListener->IsKeyPressed('T')) {
 			// sdt is the time step we send to the system
-			float sdt = gTimeAnalyse.AvgDt(); // dt gTimeAnalise.AvgDt();
+			float sdt = (float) gTimeAnalyse.AvgDt(); // dt gTimeAnalise.AvgDt();
 			if (sdt < base_dt) sdt = base_dt;
 
 			Update(sdt);
@@ -59,7 +59,8 @@ void SystemManager::Run()
 
 			std::cout << "\rDT (ms): " << dt * 1000
 				<< " \tAvg. " << 1000 * gTimeAnalyse.AvgDt()
-				<< " \tMax. " << 1000 * gTimeAnalyse.dt_max;
+				<< " \tMax. " << 1000 * gTimeAnalyse.dt_max
+				<< " \tMass " << gpFluidSystem->TotalInnerMass();
 
 			gRefreshVisual = true;
 			if (gEnableRender && gpFluidRenderer) gpFluidRenderer->DoBuffer();
@@ -87,14 +88,15 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	uint32_t r = 64 * 1;
-	real diff = 0.000000;
-	real visc = 0.000000;
-	gpFluidSystem->Setup(r, diff, visc);
+	uint32_t r = 64 * 3;
+	real diff = 0.0001f;
+	real visc = 0.0001f;
+	real vorticity = 0.01f;
+	gpFluidSystem->Setup(r, diff, visc, vorticity, FluidSystem::FSType::ORIGINAL_BORDERED);
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
-		gpEngine->BootInfo().window_info.windowedPrefResolution = {600, 600};
+		gpEngine->BootInfo().window_info.windowedPrefResolution = {800, 800};
 		gpEngine->RunAsync();	
 		gpFluidRenderer = new FluidRenderer(gpEngine);
 		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
@@ -138,6 +140,10 @@ void SystemManager::ReadInput()
 		gRefreshVisual = true;
 	}
 
+	if (gInputListener->IsKeyPressed('V')) {
+		gpFluidSystem->ToggleVert();
+	}
+
 	if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Fkey(1))) {
 		if (gpFluidRenderer->RenderLines() && gpFluidRenderer->RenderImg()) {
 			gpFluidRenderer->RenderLines() = false;
@@ -163,7 +169,7 @@ void SystemManager::ReadInput()
 // 	}
 
 	System::InputManager::AState boardState;
-	boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
+	//boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
  	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
 		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower()); }, "Blower" },
 		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Square()); }, "Square" },

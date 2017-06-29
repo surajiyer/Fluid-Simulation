@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\FluidCode.h" />
     <ClInclude Include="src\FluidInteraction.h" />
     <ClInclude Include="src\FluidUpdaters.h" />
     <ClInclude Include="src\FluidRenderer.h" />

@@ -28,8 +28,8 @@ protected:
 	Tools::Surface2D<int>	gSurface;
 	FluidRenderer*			gpRenderer;
 
-	real source = 1;
-	real force = 10;
+	real source = 10;
+	real force = 2;
 	int mx = 0, my = 0, omx = 0, omy = 0;
 	bool m_down = false;
 };

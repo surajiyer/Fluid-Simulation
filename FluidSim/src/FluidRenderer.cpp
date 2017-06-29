@@ -40,7 +40,7 @@ bool FluidRenderer::DoBuffer()
 		return false;
 	}
 
-	uint32_t maxElements = gpFluidSystem->GetSize().Area();
+	int maxElements = gpFluidSystem->GetSize().Area();
 
 	int position_el_count = points_per_obj * linepos_vsize * maxElements;
 	gLinePositions.resize(position_el_count);
@@ -62,24 +62,44 @@ bool FluidRenderer::DoBuffer()
 		
 		float mag = sqrt(velX * velX + velY * velY); //Tools::Math::Abs(velX) + Tools::Math::Abs(velY);
 
-		float vx = velX / mag / (N2*1.1);
-		float vy = velY / mag / (N2*1.1);
+		float vx = velX / mag / (N2*1.1f);
+		float vy = velY / mag / (N2*1.1f);
 
-		if (mag < 0.0000001) {
+		if (mag < 0.000000000001) {
 			vx = vy = 0;
 		}
 
 		float lx, ly;
-		lx = (xy.x + 0.5) / (float) N2;
-		ly = (xy.y + 0.5) / (float) N2;
+		lx = (xy.x + 0.5f) / (float) N2;
+		ly = (xy.y + 0.5f) / (float) N2;
 
 		gLinePositions[start_linepos + 0] = lx;
 		gLinePositions[start_linepos + 1] = ly;
 		gLinePositions[start_linepos + 2] = lx + vx;
 		gLinePositions[start_linepos + 3] = ly + vy;
+		/*gLinePositions[start_linepos + 0] = 0.05 + 0.9 * (lx);
+		gLinePositions[start_linepos + 1] = 0.05 + 0.9 * (ly);
+		gLinePositions[start_linepos + 2] = 0.05 + 0.9 * (lx + vx);
+		gLinePositions[start_linepos + 3] = 0.05 + 0.9 * (ly + vy);*/
 	}
 
 	//line_lock.unlock();
+
+	auto surface = gpFluidSystem->GetSize();
+	int pixel_count = surface.Area();
+	gPixels.resize(pixel_count * pixel_vsize);
+	auto& density = gpFluidSystem->GetDensities();
+	auto& vel_x = gpFluidSystem->GetVelX();
+	auto& vel_y = gpFluidSystem->GetVelY();
+	for (int i = 0; i < pixel_count; i++) {
+		real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
+		real dens = density[i];
+		real value = speed;
+		gPixels[i * pixel_vsize + 0] = dens;// abs(vel_x[i]); abs(vel_y[i]);
+		gPixels[i * pixel_vsize + 1] = dens;//dens * 0.1;
+		gPixels[i * pixel_vsize + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
+								  //std::cout << data[i] << ", ";
+	}
 
 	return true;
 }
@@ -89,10 +109,9 @@ void FluidRenderer::Execute(GLCore::RendererContext rc)
 	SetupImages(rc);
 	SetupLines(rc);
 
-	rc.pState->SetClearColor(0.1, 0.1, 0.1, 1);
+	rc.pState->SetClearColor(0.0, 0.0, 0.0, 1);
 	rc.pScene->AddUpdatable(this);
 	rc.pScene->AddRenderable(this);
-
 }
 
 void FluidRenderer::Update(GLCore::RendererContext rc)
@@ -101,21 +120,9 @@ void FluidRenderer::Update(GLCore::RendererContext rc)
 		//rc.pState->BindTexture(gFluidTexID);
 		glBindTexture(GL_TEXTURE_2D, gFluidTexID);
 		auto surface = gpFluidSystem->GetSize();
-		int pixel_count = surface.Area();
-		gPixels.resize(pixel_count * 3);
-		auto& density = gpFluidSystem->GetDensities();
-		auto& vel_x = gpFluidSystem->GetVelX();
-		auto& vel_y = gpFluidSystem->GetVelY();
-		for (int i = 0; i < pixel_count; i++) {
-			real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
-			real dens = density[i];
-			real value = speed;
-			gPixels[i * 3 + 0] = dens;// abs(vel_x[i]); abs(vel_y[i]);
-			gPixels[i * 3 + 1] = dens;//dens * 0.1;
-			gPixels[i * 3 + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
-		//std::cout << data[i] << ", ";
-		} // TODO : normalize?
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface.width, surface.height, 0, GL_RGB, GL_FLOAT, gPixels.data());
+		if (gPixels.size() == surface.Area() * pixel_vsize) {
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surface.width, surface.height, 0, GL_RGB, GL_FLOAT, gPixels.data());
+		}
 	}
 }
 
@@ -155,7 +162,7 @@ void FluidRenderer::SetupImages(GLCore::RendererContext rc)
 	//rc.pState->BindTexture(texID);
 	glBindTexture(GL_TEXTURE_2D, texID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 64, 64, 0, GL_RGB, GL_FLOAT, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // GL_LINEAR GL_NEAREST
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -175,7 +182,7 @@ void FluidRenderer::RenderLines(GLCore::RendererContext rc)
 {
 	gpLineShader->Prepare(rc);
 
-	uint32_t maxObjects = gpFluidSystem->GetSize().Area();
+	int maxObjects = gpFluidSystem->GetSize().Area();
 
 	int position_el_count = points_per_obj * linepos_vsize * maxObjects;
 
@@ -205,7 +212,7 @@ void FluidRenderer::RenderLines(GLCore::RendererContext rc)
 			gLineColors[i * step + j] = color_l1[j];
 		}
 		for (int j = 0; j < 4; j++) {
-			gLineColors[i * step + j + 4] = j == 3 ? 0.5 : color_l2[j];
+			gLineColors[i * step + j + 4] = j == 3 ? 0.5f : color_l2[j];
 		}
 	}
 
@@ -282,7 +289,7 @@ ImageShader::~ImageShader()
 
 void ImageShader::Prepare(GLCore::RendererContext rc)
 {
-	if (gImgID != (GLuint) -1) {
+	if (gImgID != (GLuint) 0) {
 		rc.pState->UseProgram(Shader::programID);
 		rc.pState->ActivateTextureSlot(0);
 		//rc.pState->BindTexture(gImgID);

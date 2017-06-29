@@ -17,7 +17,7 @@ public:
 	virtual void Execute(GLCore::RendererContext) override;
 
 private:
-	GLuint gImgID = -1;
+	GLuint gImgID = 0;
 };
 
 class LineShader
@@ -57,7 +57,7 @@ private:
 	void RenderLines(GLCore::RendererContext);
 	void RenderImage(GLCore::RendererContext);
 
-	GLuint				gFluidTexID = -1;
+	GLuint				gFluidTexID = 0;
 	FluidSystem*		gpFluidSystem = nullptr;
 	std::vector<float>	gPixels;
 
@@ -75,6 +75,8 @@ private:
 	const int points_per_obj = 2;
 	std::vector<float> gLinePositions;
 	std::vector<float> gLineColors;
+
+	const int pixel_vsize = 3;
 
 };
 

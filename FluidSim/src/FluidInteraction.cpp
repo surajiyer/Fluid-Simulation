@@ -42,9 +42,9 @@ bool FluidInteraction::Update(FluidUpdate fu)
 			fu.fs->VelY(i, j) = force * (omy - my);
 		}
 
-		//if (m_down) {
-		//	fu.fs->Density(i, j) = source;
-		//}
+		if (m_down) {
+			fu.fs->Density(i, j) = source;
+		}
 
 		omx = mx;
 		omy = my;

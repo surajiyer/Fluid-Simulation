@@ -91,7 +91,7 @@ void SystemManager::Setup()
 	uint32_t r = 64 * 3;
 	real diff = 0.0001f;
 	real visc = 0.0001f;
-	real vorticity = 0.01f;
+	real vorticity = 0.5f;
 	gpFluidSystem->Setup(r, diff, visc, vorticity, FluidSystem::FSType::ORIGINAL_BORDERED);
 
 	if (gEnableRender) {

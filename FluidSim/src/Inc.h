@@ -15,6 +15,7 @@ using MatX = Eigen::Matrix<real, Eigen::Dynamic, Eigen::Dynamic>;
 class FluidSystem;
 class FluidRenderer;
 class FluidInteraction;
+class FluidCollider;
 
 namespace FluidUpdaters{
 class FluidGen;

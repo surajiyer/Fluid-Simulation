@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\FluidCollider.h" />
     <ClInclude Include="src\FluidCode.h" />
     <ClInclude Include="src\FluidInteraction.h" />
     <ClInclude Include="src\FluidUpdaters.h" />
@@ -28,6 +29,7 @@
     <ClInclude Include="src\SystemManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\FluidCollider.cpp" />
     <ClCompile Include="src\FluidInteraction.cpp" />
     <ClCompile Include="src\FluidUpdaters.cpp" />
     <ClCompile Include="src\FluidRenderer.cpp" />

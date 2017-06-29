@@ -1,7 +1,7 @@
 #include "FluidSystem.h"
+#include "FluidCollider.h"
 
 #include <Tools/Math.h>
-
 #include <limits> // for infinity
 
 FluidSystem::FluidSystem()
@@ -18,6 +18,7 @@ void FluidSystem::Setup(int N, real diff, real visc, real vorticity, FSType fst)
 	this->diff = diff;
 	this->visc = visc;
 	this->vorticity = vorticity;
+	this->steps = 20;
 
 	int mem_size = (N + 2) * (N + 2);
 
@@ -40,42 +41,14 @@ void FluidSystem::Setup(int N, real diff, real visc, real vorticity, FSType fst)
 
 	cellInfo.resize(mem_size);
 
-	Tools::Fill<byte>(cellInfo, CellInfo::NORMAL_CELL);
-
-	// set edges as non fluid
-	for (int i = 1; i <= N; i++) {
-		cellInfo[ID(i, 0)] &= ~CellInfo::FLUID;
-		cellInfo[ID(i, N + 1)] &= ~CellInfo::FLUID;
-		cellInfo[ID(0, i)] &= ~CellInfo::FLUID;
-		cellInfo[ID(N + 1, i)] &= ~CellInfo::FLUID;
-	}
-
-	// set corners as non fluid
-	cellInfo[ID(0, 0)] &= ~CellInfo::FLUID;
-	cellInfo[ID(0, N + 1)] &= ~CellInfo::FLUID;
-	cellInfo[ID(N + 1, 0)] &= ~CellInfo::FLUID;
-	cellInfo[ID(N + 1, N + 1)] &= ~CellInfo::FLUID;
-
-	CalcBorderFromContent();
+	ResetCellInfo();
 
 	// TODO; check if border is closed
 
 	// TODO : temp code
 	// make a square
-	real size = 0.3;
-	int low = 1 + N / 2 - size * N / 2;
-	int high = 1 + N / 2 + size * N / 2;
 
-	for (int i = low; i <= high; i++) {
-		// bottom side
-		DisableEdge(i, low, i, low - 1);
-		// top side
-		DisableEdge(i, high, i, high + 1);
-		// left side
-		DisableEdge(low, i, low - 1, i);
-		// right side
-		DisableEdge(high, i, high + 1, i);
-	}
+	CalcBorderFromContent();
 
 	//for (int i = 0; i < N + 2; i++) {
 	//	cellInfo[ID(i, N / 2)] &= ~CellInfo::RIGHT;
@@ -120,22 +93,33 @@ void FluidSystem::Update(real dt)
 	Tools::Fill<real>(vY.Prev(), 0);
 	Tools::Fill<real>(dens.Prev(), 0);
 
+	CallColliders();
+
+	// todo: remove temp square code
+	real size = 0.3;
+	int low = 1 + N / 2 - size * N / 2;
+	int high = 1 + N / 2 + size * N / 2;
+
+	for (int i = low; i <= high; i++) {
+		// bottom side
+		//DisableEdge(i, low, i, low - 1);
+		// top side
+		//DisableEdge(i, high, i, high + 1);
+		// left side
+		//DisableEdge(low, i, low - 1, i);
+		// right side
+		//DisableEdge(high, i, high + 1, i);
+		for (int j = low; j <= high; j++) {
+			cellInfo[ID(i, j)] &= ~CellInfo::FLUID;
+		}
+	}
+
+	CalcBorderFromContent();
+
 	if (useVort) VortConfinement();
 
 	CallUpdates(dt, FluidUpdate::VEL);
 	(this->*pVelStep)(dt);
-
-	/*for (int i = 0; i <= N + 1; i++) {
-		auto& vTop = vY.Curr()[ID(i, N + 1)];
-		auto& vBot = vY.Curr()[ID(i, 0)];
-		auto& vRight = vX.Curr()[ID(i, N + 1)];
-		auto& vLeft = vX.Curr()[ID(i, 0)];
-		vTop = 0;// -(vTop > 0 ? -vTop : vTop);
-		vBot = 0;//-(vBot < 0 ? -vBot : vBot);
-		vLeft = 0;// -(vLeft < 0 ? -vLeft : vLeft);
-		vRight = 0;// -(vRight > 0 ? -vRight : vRight);
-	}*/
-
 	CallUpdates(dt, FluidUpdate::DENS);
 	(this->*pDensStep)(dt);
 }
@@ -166,6 +150,11 @@ void FluidSystem::RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>* ptr, bool 
 {
 	Tools::RemoveOneReverse(gUpdaters, ptr);
 	if (to_delete) delete ptr;
+}
+
+void FluidSystem::AddCollider(FluidCollider* pfc)
+{
+	gColliders.push_back(pfc);
 }
 
 void FluidSystem::Clear()
@@ -452,7 +441,7 @@ void FluidSystem::LinearSolve1(int N, int b, list x, list x0, real a, real c)
 {
 	int i, j, k;
 
-	int limit = a > 0 ? 20 : 1;
+	int limit = a > 0 ? steps : 1;
 
 	for (k = 0; k < limit; k++) {
 		for (j = 1; j <= N; j++) {
@@ -468,7 +457,7 @@ void FluidSystem::LinearSolve1B(int N, int b, list x, list x0, real a, real c)
 {
 	int i, j, k;
 
-	int limit = a > 0 ? 20 : 1;
+	int limit = a > 0 ? steps : 1;
 
 	// scale my own value based on b if neighbour is unreachable
 	real bScX = (b == 1) ? -1 : 1;
@@ -498,7 +487,7 @@ void FluidSystem::LinearSolve2(int N, int b, list x, list x0, real a, real c)
 {
 	int i, j, k;
 
-	int limit = a > 0 ? 20 : 1;
+	int limit = a > 0 ? steps : 1;
 	limit += ((limit % 2 == 0) ? 1 : 0);
 
 	for (k = 0; k < limit; k++) {
@@ -522,7 +511,7 @@ void FluidSystem::LinearSolve3(int N, int b, list x, list x0, real dt)
 	// scales with density
 	int i, j, k;
 
-	int limit = diff > 0 ? 20 : 1;
+	int limit = diff > 0 ? steps : 1;
 	limit += ((limit % 2 == 0) ? 1 : 0);
 
 	for (k = 0; k < limit; k++) {
@@ -856,6 +845,32 @@ void FluidSystem::CalcBorderFromContent()
 			m |= ((!!(b & FLUID)) == mIsFluid) * BOTTOM;
 			cellInfo[ID(i, j)] = m;
 		}
+	}
+}
+
+void FluidSystem::ResetCellInfo()
+{
+	Tools::Fill<byte>(cellInfo, CellInfo::NORMAL_CELL);
+
+	// set edges as non fluid
+	for (int i = 1; i <= N; i++) {
+		cellInfo[ID(i, 0)] &= ~CellInfo::FLUID;
+		cellInfo[ID(i, N + 1)] &= ~CellInfo::FLUID;
+		cellInfo[ID(0, i)] &= ~CellInfo::FLUID;
+		cellInfo[ID(N + 1, i)] &= ~CellInfo::FLUID;
+	}
+
+	// set corners as non fluid
+	cellInfo[ID(0, 0)] &= ~CellInfo::FLUID;
+	cellInfo[ID(0, N + 1)] &= ~CellInfo::FLUID;
+	cellInfo[ID(N + 1, 0)] &= ~CellInfo::FLUID;
+	cellInfo[ID(N + 1, N + 1)] &= ~CellInfo::FLUID;
+}
+
+void FluidSystem::CallColliders()
+{
+	for (auto pfC : gColliders) {
+		pfC->FillGrid(N, cellInfo);
 	}
 }
 

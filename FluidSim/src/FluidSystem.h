@@ -17,18 +17,6 @@ public:
 		HYBRID
 	};
 
-	enum CellInfo : byte {
-		// for each direction if there is fluid there:
-		LEFT = 1,
-		RIGHT = 2,
-		TOP = 4,
-		BOTTOM = 8,
-		// if it is a fluid cell : otherwise its inside an object or the boundary
-		FLUID = 16,
-		// Combined value for optimalization of standard cell, all others are true
-		NORMAL_CELL = 1 + 2 + 4 + 8 + 16
-	};
-
 	FluidSystem();
 	~FluidSystem();
 
@@ -43,6 +31,8 @@ public:
 
 	void AddUpdater(Tools::UpdatableR<bool, FluidUpdate>*);
 	void RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>*, bool to_delete);
+
+	void AddCollider(FluidCollider*);
 
 	void Clear();
 	void ClearUpdaters();
@@ -139,8 +129,6 @@ private:
 	void ProjectB(int N, list u, list v, list p, list div);
 
 	void VortConfinement();
-
-	void CalcBorderFromContent();
 	
 	BilinearCoeffs RayTrace(int N, int sx, int sy, real tx, real ty, list grid);
 
@@ -153,12 +141,16 @@ private:
 	inline void EulerForward(int N, int x, int y, real dtN, list vX, list vY, list d, list d0);
 	inline void MidpointForward(int N, int x, int y, real dtN, list vX, list vY, list d, list d0);
 
+	// neighbour stuffs
 	bool CanMoveNeighbour(int x0, int y0, int x1, int y1);
-
 	void DisableEdge(int x0, int y0, int x1, int y1);
+	void CalcBorderFromContent();
+	void ResetCellInfo();
+	void CallColliders();
 
 public:
 	int N;
+	int steps;
 	real diff, visc, vorticity;
 
 	FSFuncDT pDensStep;
@@ -184,6 +176,7 @@ public:
 	std::vector<byte> cellInfo;
 
 	std::vector<Tools::UpdatableR<bool, FluidUpdate>*> gUpdaters;
+	std::vector<FluidCollider*> gColliders;
 
 	bool useVort = true;
 };

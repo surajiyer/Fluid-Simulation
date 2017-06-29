@@ -53,7 +53,7 @@ bool Gravity::Update(FluidUpdate fu)
 		int N = fu.fs->GetN_inner();
 		for (int i = 1; i <= N; i++) {
 			for (int j = 1; j <= N; j++) {
-				fu.fs->VelY(i, j) -= fu.dt * 1 * fu.fs->Density(i, j);
+				fu.fs->VelY(i, j) -= fu.dt * 0.7 * fu.fs->Density(i, j);
 			}
 		}
 	}

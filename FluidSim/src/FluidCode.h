@@ -10,7 +10,17 @@ struct FluidUpdate {
 	Type type;
 };
 
-
+enum CellInfo : byte {
+	// for each direction if there is fluid there:
+	LEFT = 1,
+	RIGHT = 2,
+	TOP = 4,
+	BOTTOM = 8,
+	// if it is a fluid cell : otherwise its inside an object or the boundary
+	FLUID = 16,
+	// Combined value for optimalization of standard cell, all others are true
+	NORMAL_CELL = 1 + 2 + 4 + 8 + 16
+};
 
 struct BilinearCoeffs {
 	real s0, s1, t0, t1;

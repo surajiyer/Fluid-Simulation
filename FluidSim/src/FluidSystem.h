@@ -4,14 +4,14 @@
 
 class FluidSystem
 {
-	using list = std::vector<real>&;
 	typedef void (FluidSystem::*FSFuncDT)(real);
 
 public:
 
 	enum class FSType {
 		ORIGINAL, // complete
-		ORIGINAL_BORDERED, // doesnt respect borders properly
+		ORIGINAL_BORDERED,
+		ORIGINAL_BORDERED_MF, // multi fluid
 		V2, // works -> could use density pressue forces
 		V2_BORDERED,  // forward step disrespects borders
 		HYBRID
@@ -20,34 +20,41 @@ public:
 	FluidSystem();
 	~FluidSystem();
 
-	void Setup(int N, real diff, real visc, real vort, FSType);
+	void Setup(int N, real vorticity, std::vector<FluidProps>&, FSType);
 	void SetType(FSType);
 	void Update(real dt);
 
 	void ToggleVert();
 
-	void SetDensity(int x, int y, real v);
+	inline void SetDensity(int x, int y, real v, int dn);
+	inline void SetDensity(int x, int y, real v);
 	void SetVelocity(int x, int y, real vx, real vy);
 
 	void AddUpdater(Tools::UpdatableR<bool, FluidUpdate>*);
 	void RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>*, bool to_delete);
 
 	void AddCollider(FluidCollider*);
+	void AddBorder(FluidBorder*);
 
 	void Clear();
 	void ClearUpdaters();
 
 	Tools::Surface2D<int> GetSize();
 	int GetN_inner();
-	list GetDensities();
+	std::vector<FlipFlopArr<real>>& GetDensities();
+	std::vector<FluidProps>& GetProperties();
+	std::vector<byte>& GetInfo();
 	list GetVelX();
 	list GetVelY();
 
-	real& Density(int x, int y);
+	real& Density(int x, int y, int dn);
+	real CombinedDensity(int x, int y);
 	real& VelX(int x, int y);
 	real& VelY(int x, int y);
 
-	void AddFluid(int x, int y, real d, real vx, real vy, bool speedModify = true);
+	void DisableEdge(int x0, int y0, int x1, int y1);
+
+	void AddFluid(int x, int y, real d, real vx, real vy, int dn);
 	real TotalInnerMass(bool curr = true);
 
  	__forceinline int ID(int i, int j) {
@@ -59,48 +66,19 @@ public:
 	}
 
 private:
-	//typedef real S;
-	template<class S>
-	class FlipFlopArr {
-	public:
-		std::vector<S>				gStates[2];
-		uint8_t						gPrevID = 0;
-		uint8_t						gCurrID = 1;
-
-		inline list Curr() {
-			return gStates[gCurrID];
-		}
-
-		inline list Prev() {
-			return gStates[gPrevID];
-		}
-
-		inline void Swap() {
-			gPrevID = gCurrID;
-			gCurrID ^= 1; // xor
-		}
-
-		inline void Resize(int n) {
-			gStates[0].resize(n);
-			gStates[1].resize(n);
-		}
-
-		inline void SetZero() {
-			Tools::Fill<S>(gStates[0], 0);
-			Tools::Fill<S>(gStates[1], 0);
-		}
-	};
 
 	void CallUpdates(real dt, FluidUpdate::Type);
 
-	void DensStep1(real dt);
-	void DensStep1B(real dt);
-	void DensStep2(real dt);
-	void DensStep2B(real dt);
-	void DensStep3(real dt);
+	void DensStep1(real dt);	// basic density step, but diffusing is replace by blurring/spreading density
+	void DensStep1BS(real dt);	// + respects border + respects multi fluid diffusion
 
-	void VelStep1(real dt);
-	void VelStep1B(real dt);
+	void DensStep2(real dt);	// just test versions
+	void DensStep2B(real dt);	//
+	void DensStep3(real dt);	//
+
+	void VelStep1(real dt);		// basic velocity field
+	void VelStep1B(real dt);	// + respects border
+	void VelStep1BS(real dt);	// + respects multi fluid viscosity + air has 0 viscosity
 
 	void AddArrDt(int N, list x, list s, real dt);
 
@@ -108,16 +86,19 @@ private:
 	void SetBorder(int N, int b, list x);
 	void PushBorderInward(int N, list x);
 
-	void LinearSolve1(int N, int b, list x, list x0, real a, real c);
-	void LinearSolve1B(int N, int b, list x, list x0, real a, real c);
-	void LinearSolve2(int N, int b, list x, list x0, real a, real c);
-	void LinearSolve3(int N, int b, list x, list x0, real dt);
+	void LinearSolve1(int N, int b, list x, list x0, real a, real c);					// basic solve
+	void LinearSolve1B(int N, int b, list x, list x0, real a, real c);					// + supports border
+	void LinearSolve1BS(int N, int b, list x, list x0, real aSc, real a_fallback, FluidProps::FP type);  // + supports viscosity mixing (for velocity field)
+	void Blur(int N, int b, list x, list x0, real a, real c);							// alternate diffusion
+	void BlurB(int N, int b, list x, list x0, real a, real c);							// alternate diffusion + border
+	void LinearSolve3_not_updated(int N, int b, list x, list x0, real dt);
 
-	void Diffuse1(int N, int b, list x, list x0, real diff, real dt);
-	void Diffuse1B(int N, int b, list x, list x0, real diff, real dt);
-	void Diffuse2(int N, int b, list x, list x0, real diff, real dt);
-	void Diffuse2B(int N, int b, list x, list x0, real diff, real dt);
-	void Diffuse3(int N, int b, list x, list x0, real diff, real dt);
+	void Diffuse1(int N, int b, list x, list x0, real coef, real dt);
+	void Diffuse1B(int N, int b, list x, list x0, real coef, real dt);
+	void Diffuse1BS(int N, int b, list x, list x0, FluidProps::FP fpid, real dt);
+	void Diffuse_blur(int N, int b, list x, list x0, real coef, real dt);
+	void Diffuse_blurB(int N, int b, list x, list x0, real coef, real dt);
+	void Diffuse3(int N, int b, list x, list x0, real coef, real dt);
 
 	void Advect1(int N, int b, list d, list d0, list u, list v, real dt);
 	void Advect1B(int N, int b, list d, list d0, list u, list v, real dt);
@@ -129,6 +110,7 @@ private:
 	void ProjectB(int N, list u, list v, list p, list div);
 
 	void VortConfinement();
+	void Damp(list vel, float amount, float dt);
 	
 	BilinearCoeffs RayTrace(int N, int sx, int sy, real tx, real ty, list grid);
 
@@ -143,22 +125,29 @@ private:
 
 	// neighbour stuffs
 	bool CanMoveNeighbour(int x0, int y0, int x1, int y1);
-	void DisableEdge(int x0, int y0, int x1, int y1);
 	void CalcBorderFromContent();
 	void ResetCellInfo();
 	void CallColliders();
+	void CallBorders();
 
 public:
 	int N;
 	int steps;
-	real diff, visc, vorticity;
+	int fluid_count;
+
+	std::vector<FluidProps> fprops;
+
+	real visc_air = 0.0002;
+	real damp = 0.1;
+	real visc_avg;
+	real vorticity;
 
 	FSFuncDT pDensStep;
 	FSFuncDT pVelStep;
 
 	FlipFlopArr<real> vX;
 	FlipFlopArr<real> vY;
-	FlipFlopArr<real> dens;
+	std::vector<FlipFlopArr<real>> densList;
 
 	std::vector<real> buffer1;
 	std::vector<real> buffer2;
@@ -177,6 +166,7 @@ public:
 
 	std::vector<Tools::UpdatableR<bool, FluidUpdate>*> gUpdaters;
 	std::vector<FluidCollider*> gColliders;
+	std::vector<FluidBorder*> gBorders;
 
 	bool useVort = true;
 };
@@ -259,4 +249,14 @@ void FluidSystem::MidpointForward(int N, int x, int y, real dtN, list vX, list v
 	d[ID(s.i0, s.j1)] += s.s0*s.t1*myVal;
 	d[ID(s.i1, s.j0)] += s.s1*s.t0*myVal;
 	d[ID(s.i1, s.j1)] += s.s1*s.t1*myVal;
+}
+
+void FluidSystem::SetDensity(int x, int y, real v)
+{
+	SetDensity(x, y, v, 0);
+}
+
+void FluidSystem::SetDensity(int x, int y, real v, int dn)
+{
+	densList[dn].Curr()[ID(x, y)] = v;
 }

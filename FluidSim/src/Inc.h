@@ -16,6 +16,7 @@ class FluidSystem;
 class FluidRenderer;
 class FluidInteraction;
 class FluidCollider;
+class FluidBorder;
 
 namespace FluidUpdaters{
 class FluidGen;

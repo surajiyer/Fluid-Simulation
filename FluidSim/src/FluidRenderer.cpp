@@ -89,15 +89,40 @@ bool FluidRenderer::DoBuffer()
 	int pixel_count = surface.Area();
 	gPixels.resize(pixel_count * pixel_vsize);
 	auto& density = gpFluidSystem->GetDensities();
+	auto& props = gpFluidSystem->GetProperties();
+	auto& info = gpFluidSystem->GetInfo();
+
 	auto& vel_x = gpFluidSystem->GetVelX();
 	auto& vel_y = gpFluidSystem->GetVelY();
 	for (int i = 0; i < pixel_count; i++) {
 		real speed = sqrt(vel_x[i] * vel_x[i] + vel_y[i] * vel_y[i]);
-		real dens = density[i];
 		real value = speed;
-		gPixels[i * pixel_vsize + 0] = dens;// abs(vel_x[i]); abs(vel_y[i]);
-		gPixels[i * pixel_vsize + 1] = dens;//dens * 0.1;
-		gPixels[i * pixel_vsize + 2] = dens;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
+
+		real r, g, b;
+		r = g = b = 0;
+
+		if (info[i] & FLUID) {
+			real d_total = 0;
+			for (int n = 0; n < density.size(); n++) {
+				real d = density[n].Curr()[i];
+				d_total += d;
+				r += props[n].color[0] * d;
+				g += props[n].color[1] * d;
+				b += props[n].color[2] * d;
+			}
+			if (d_total > 1) {
+				r /= d_total;
+				g /= d_total;
+				b /= d_total;
+			}
+		}
+		else {
+			g = 1;
+		}
+
+		gPixels[i * pixel_vsize + 0] = r;// abs(vel_x[i]); abs(vel_y[i]);
+		gPixels[i * pixel_vsize + 1] = g;//dens * 0.1;
+		gPixels[i * pixel_vsize + 2] = b;//std::min(dens * 1.1, 1.0) - std::min(dens * 0.1, 1.0);
 								  //std::cout << data[i] << ", ";
 	}
 

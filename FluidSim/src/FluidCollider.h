@@ -7,18 +7,18 @@ public:
 	FluidCollider();
 	~FluidCollider();
 
-	virtual void FillGrid(int N, std::vector<byte> cellInfo) = 0;
+	virtual void FillGrid(int N, std::vector<byte>& cellInfo) = 0;
 };
 
-class SquareCollider 
-	: public FluidCollider 
+class RectCollider
+	: public FluidCollider
 {
 public:
-	SquareCollider(int ox, int oy, float w, float h, float r);
+	RectCollider(int ox, int oy, real w, real h, real r);
 
-	virtual void FillGrid(int N, std::vector<byte> cellInfo) override;
+	virtual void FillGrid(int N, std::vector<byte>& cellInfo) override;
 
-	int ox, oy;
-	float w, h;
-	float rotation;
+	Vec2 loc;
+	Vec2 scale;
+	real rot;
 };

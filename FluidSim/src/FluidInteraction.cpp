@@ -43,7 +43,7 @@ bool FluidInteraction::Update(FluidUpdate fu)
 		}
 
 		if (m_down) {
-			fu.fs->Density(i, j) = source;
+			fu.fs->Density(i, j, 0) = source;
 		}
 
 		omx = mx;

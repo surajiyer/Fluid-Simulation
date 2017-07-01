@@ -3,6 +3,8 @@
 #include "FluidRenderer.h"
 #include "FluidUpdaters.h"
 #include "FluidInteraction.h"
+#include "FluidCollider.h"
+#include "FluidBorder.h"
 
 #include <Tools/Include.h>
 #include <WindowWin32/InputManager_get.h>
@@ -88,15 +90,22 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	uint32_t r = 64 * 3;
-	real diff = 0.0001f;
+	int res_inner = 64 * 3;
 	real visc = 0.0001f;
-	real vorticity = 0.5f;
-	gpFluidSystem->Setup(r, diff, visc, vorticity, FluidSystem::FSType::ORIGINAL_BORDERED);
+	real vorticity = 0.55f; // if < 0.0001 viscocity, high vorticity will behave irratic
+
+	std::vector<FluidProps> props = {
+		{ { 0.0000f,	0.0001f }, {	0.05f,	0.05f,	1.0f} },
+		{ { 0.00005f,	0.0001f }, {	1.0f,	0.05f,	0.05f} },
+	};
+
+	gpFluidSystem->Setup(res_inner, vorticity, props, FluidSystem::FSType::ORIGINAL_BORDERED_MF);
+	//gpFluidSystem->AddCollider(new RectCollider(1+res_inner/2.0,1+res_inner/2.0,res_inner/4.0,res_inner/4.0, 0.6));
+	gpFluidSystem->AddBorder(new SquareBorder());
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
-		gpEngine->BootInfo().window_info.windowedPrefResolution = {800, 800};
+		gpEngine->BootInfo().window_info.windowedPrefResolution = {800,800};
 		gpEngine->RunAsync();	
 		gpFluidRenderer = new FluidRenderer(gpEngine);
 		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
@@ -171,9 +180,10 @@ void SystemManager::ReadInput()
 	System::InputManager::AState boardState;
 	//boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
  	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
-		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower()); }, "Blower" },
-		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Square()); }, "Square" },
-		{ 3, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Gravity()); }, "Gravity" },
+		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower(0)); }, "Blower" },
+		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower(1)); }, "Blower" },
+		{ 3, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Square()); }, "Square" },
+		{ 4, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Gravity()); }, "Gravity" },
  	};
 
  	for (auto entry : scene_key_mapping) {

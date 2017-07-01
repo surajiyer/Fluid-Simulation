@@ -7,9 +7,13 @@
 #include <OpenGLBase/src/CGMain/MeshGen.h>
 #include <OpenGLBase/src/GLBase/Environment/Scene.h>
 
+#include "Trace.h"
+
 #include <iostream>
 #include <stdio.h>
 #include <string>
+
+using namespace trace;
 
 int N = 16;
 
@@ -79,8 +83,6 @@ void Test() {
 }
 
 void main() {
-	//Test();
-
 	SystemManager sm;
 	sm.Run();
 }

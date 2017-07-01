@@ -30,16 +30,26 @@ bool Square::Update(FluidUpdate fu)
 	return false;
 }
 
+Blower::Blower(int dn)
+{
+	this->dn = dn;
+}
+
 bool Blower::Update(FluidUpdate fu)
 {
 	if (fu.type == FluidUpdate::VEL) {
-		real d = fu.fs->GetSize().Area() / (64.0f*4.0f*64.0f*4.0f);
-		real v = 0.8 * fu.fs->GetSize().width / (64.0f);
-		real vx = v;
-		real vy = v;
-		for (int i = 3; i < 5; i++) {
-			for (int j = 3; j < 5; j++) {
-				fu.fs->AddFluid(i, j, d, vx, vy, false);
+		real d = 5;
+		real v = 1.8 * fu.fs->GetSize().width / (64.0f);
+		real vx = dn == 0 ? v : -v;
+		real vy = dn == 0 ? v : v;
+		int N = fu.fs->N;
+		int size = 2;
+		int offset = 3;
+		int low = 1 + (dn == 0 ? offset : (N - offset - size));
+		int high = 1 + (dn == 0 ? (offset + size) : (N - offset));
+		for (int i = low; i < high; i++) {
+			for (int j = offset; j < offset + size; j++) {
+				fu.fs->AddFluid(i, j, d, vx, vy, dn);
 			}
 		}
 	}
@@ -53,7 +63,7 @@ bool Gravity::Update(FluidUpdate fu)
 		int N = fu.fs->GetN_inner();
 		for (int i = 1; i <= N; i++) {
 			for (int j = 1; j <= N; j++) {
-				fu.fs->VelY(i, j) -= fu.dt * 0.7 * fu.fs->Density(i, j);
+				fu.fs->VelY(i, j) -= fu.dt * 0.7 * fu.fs->CombinedDensity(i, j);
 			}
 		}
 	}

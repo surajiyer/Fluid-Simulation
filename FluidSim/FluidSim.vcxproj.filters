@@ -39,6 +39,12 @@
     <ClInclude Include="src\FluidCollider.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Trace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FluidBorder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -60,6 +66,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\FluidCollider.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FluidBorder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

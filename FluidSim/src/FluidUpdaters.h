@@ -9,7 +9,10 @@ class Blower
 	: public Tools::UpdatableR<bool, FluidUpdate>
 {
 public:
+	Blower(int dn);
 	virtual bool Update(FluidUpdate) override;
+
+	int dn;
 };
 
 class Gravity

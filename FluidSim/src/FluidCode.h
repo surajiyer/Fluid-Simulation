@@ -1,6 +1,8 @@
 #pragma once
 #include "Inc.h"
 
+using list = std::vector<real>&;
+
 struct FluidUpdate {
 	enum Type {
 		VEL, DENS
@@ -8,6 +10,52 @@ struct FluidUpdate {
 	FluidSystem* fs;
 	real dt;
 	Type type;
+};
+
+template<class S>
+class FlipFlopArr {
+public:
+	std::vector<S>				gStates[2];
+	uint8_t						gPrevID = 0;
+	uint8_t						gCurrID = 1;
+
+	inline list Curr() {
+		return gStates[gCurrID];
+	}
+
+	inline list Prev() {
+		return gStates[gPrevID];
+	}
+
+	inline void Swap() {
+		gPrevID = gCurrID;
+		gCurrID ^= 1; // xor
+	}
+
+	inline void Resize(int n) {
+		gStates[0].resize(n);
+		gStates[1].resize(n);
+	}
+
+	inline void SetZero() {
+		Tools::Fill<S>(gStates[0], 0);
+		Tools::Fill<S>(gStates[1], 0);
+	}
+};
+
+struct FluidProps {
+	enum FP {
+		DIFF = 0, VISC = 1
+	};
+	real coef[2];
+	real color[3];
+
+	real& Diff() {
+		return coef[DIFF];
+	}
+	real& Visc() {
+		return coef[VISC];
+	}
 };
 
 enum CellInfo : byte {

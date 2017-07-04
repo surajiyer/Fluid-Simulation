@@ -62,8 +62,8 @@ bool FluidRenderer::DoBuffer()
 		
 		float mag = sqrt(velX * velX + velY * velY); //Tools::Math::Abs(velX) + Tools::Math::Abs(velY);
 
-		float vx = velX / mag / (N2*1.1f);
-		float vy = velY / mag / (N2*1.1f);
+		float vx = velX / mag / (N2*1.05f);
+		float vy = velY / mag / (N2*1.05f);
 
 		if (mag < 0.000000000001) {
 			vx = vy = 0;

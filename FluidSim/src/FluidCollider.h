@@ -7,7 +7,16 @@ public:
 	FluidCollider();
 	~FluidCollider();
 
-	virtual void FillGrid(int N, std::vector<byte>& cellInfo) = 0;
+	
+	void Update(int N, FluidSystem*, std::vector<byte>& cellInfo, real dt);
+	virtual void UpdateChild(int N, FluidSystem*, std::vector<byte>& cellInfo, real dt) = 0;
+
+protected:
+	Vec2 vel;
+
+	Vec2 loc;
+	Vec2 scale;
+	real rot;
 };
 
 class RectCollider
@@ -16,9 +25,5 @@ class RectCollider
 public:
 	RectCollider(int ox, int oy, real w, real h, real r);
 
-	virtual void FillGrid(int N, std::vector<byte>& cellInfo) override;
-
-	Vec2 loc;
-	Vec2 scale;
-	real rot;
+	virtual void UpdateChild(int N, FluidSystem*, std::vector<byte>& cellInfo, real dt) override;
 };

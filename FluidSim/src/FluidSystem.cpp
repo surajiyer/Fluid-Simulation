@@ -80,7 +80,7 @@ void FluidSystem::SetType(FSType fst)
 	}
 	else if (fst == FSType::ORIGINAL_BORDERED_MF) {
 		pDensStep = &FluidSystem::DensStep1BS;
-		pVelStep = &FluidSystem::VelStep1BS;
+		pVelStep = &FluidSystem::VelStep1BSO;
 	}
 	else if (fst == FSType::V2) {
 		pDensStep = &FluidSystem::DensStep2;
@@ -106,19 +106,23 @@ void FluidSystem::Update(real dt)
 		Tools::Fill<real>(dens.Prev(), 0);
 	}
 
-	CallColliders();
+	// obstacles | modifies velocity inside objects aswell
+	ResetCellInfo();
+	CallColliders(dt);
 	CalcBorderFromContent();
 	CallBorders();
 
+	// velocity
+	CallUpdates(dt, FluidUpdate::VEL);
 	if (useVort) VortConfinement();
+	(this->*pVelStep)(dt);
+
+	// density
+	CallUpdates(dt, FluidUpdate::DENS);
+	(this->*pDensStep)(dt);
 
 	Damp(vX.Curr(), damp, dt);
 	Damp(vY.Curr(), damp, dt);
-
-	CallUpdates(dt, FluidUpdate::VEL);
-	(this->*pVelStep)(dt);
-	CallUpdates(dt, FluidUpdate::DENS);
-	(this->*pDensStep)(dt);
 }
 
 void FluidSystem::ToggleVert()
@@ -404,6 +408,29 @@ void FluidSystem::VelStep1BS(real dt)
 	ProjectB(N, vX.Curr(), vY.Curr(), vX.Prev(), vY.Prev());
 }
 
+void FluidSystem::VelStep1BSO(real dt)
+{
+	AddArrDt(N, vX.Curr(), vY.Prev(), dt);
+	AddArrDt(N, vY.Curr(), vY.Prev(), dt);
+
+	vX.Swap();
+
+	Diffuse1BSO(N, 1, vX.Curr(), vX.Prev(), FluidProps::VISC, dt);
+
+	vY.Swap();
+
+	Diffuse1BSO(N, 2, vY.Curr(), vY.Prev(), FluidProps::VISC, dt);
+
+	ProjectBO(N, vX.Curr(), vY.Curr(), vX.Prev(), vY.Prev());
+
+	vX.Swap();
+	vY.Swap();
+
+	Advect1B(N, 1, vX.Curr(), vX.Prev(), vX.Prev(), vY.Prev(), dt);
+	Advect1B(N, 2, vY.Curr(), vY.Prev(), vX.Prev(), vY.Prev(), dt);
+	ProjectBO(N, vX.Curr(), vY.Curr(), vX.Prev(), vY.Prev());
+}
+
 void FluidSystem::AddArrDt(int N, list x, list s, real dt)
 {
 	int i, size = (N + 2)*(N + 2);
@@ -535,7 +562,100 @@ void FluidSystem::LinearSolve1B(int N, int b, list x, list x0, real a, real c)
 	}
 }
 
+void FluidSystem::LinearSolve1BO(int N, int b, list x, list x0, real a, real c)
+{
+	int i, j, k;
+
+	int limit = a > 0 ? steps : 1;
+
+	// scale my own value based on b if neighbour is unreachable
+	real bScX = (b == 1) ? -1 : 1;
+	real bScY = (b == 2) ? -1 : 1;
+
+	for (k = 0; k < limit; k++) {
+		for (j = 1; j <= N; j++) {
+			for (i = 1; i <= N; i++) {
+				int id = ID(i, j);
+				auto info = cellInfo[id];
+
+				if (info & FLUID) {
+					int lid = ID(i - 1, j);
+					int rid = ID(i + 1, j);
+					int tid = ID(i, j + 1);
+					int bid = ID(i, j - 1);
+
+					// if we can go right, its the standard.
+					// otherwise, we reflect and if there is an object to the right, we add its speed aswell
+					real my_val = x[id];
+					real add_value =	(info & RIGHT) ?	x[rid] : (bScX * my_val + (cellInfo[rid] & FLUID ? 0 : x[rid]));
+					add_value +=		(info & LEFT) ?		x[lid] : (bScX * my_val + (cellInfo[lid] & FLUID ? 0 : x[lid]));
+					add_value +=		(info & TOP) ?		x[tid] : (bScX * my_val + (cellInfo[tid] & FLUID ? 0 : x[tid]));
+					add_value +=		(info & BOTTOM) ?	x[bid] : (bScX * my_val + (cellInfo[bid] & FLUID ? 0 : x[bid]));
+
+					x[id] = (x0[id] + a * add_value) / c;
+				}
+			}
+		}
+	}
+}
+
 void FluidSystem::LinearSolve1BS(int N, int b, list x, list x0, real aSc, real a_fallback, FluidProps::FP type)
+{
+	int i, j, k;
+
+	int limit = steps;
+
+	// scale my own value based on b if neighbour is unreachable
+	real bScX = (b == 1) ? -1 : 1;
+	real bScY = (b == 2) ? -1 : 1;
+
+	for (k = 0; k < limit; k++) {
+		for (j = 1; j <= N; j++) {
+			for (i = 1; i <= N; i++) {
+				int id = ID(i, j);
+				auto info = cellInfo[id];
+
+				if (info & FLUID) {
+					int lid = ID(i - 1, j);
+					int rid = ID(i + 1, j);
+					int tid = ID(i, j + 1);
+					int bid = ID(i, j - 1);
+
+					// if we can go right, its the standard.
+					// otherwise, we reflect and if there is an object to the right, we add its speed aswell
+					real my_val = x[id];
+					real add_value = (info & RIGHT) ? x[rid] : (bScX * my_val + (cellInfo[rid] & FLUID ? 0 : x[rid]));
+					add_value += (info & LEFT) ? x[lid] : (bScX * my_val + (cellInfo[lid] & FLUID ? 0 : x[lid]));
+					add_value += (info & TOP) ? x[tid] : (bScX * my_val + (cellInfo[tid] & FLUID ? 0 : x[tid]));
+					add_value += (info & BOTTOM) ? x[bid] : (bScX * my_val + (cellInfo[bid] & FLUID ? 0 : x[bid]));
+
+					real c = 1;
+					real a = 0;
+					real dens_total = 0;
+
+					// loop over all densities, add them together, normalize, calc combined viscosity
+					for (int fluidNr = 0; fluidNr < fluid_count; fluidNr++) {
+						real dVal = densList[fluidNr].Curr()[id];
+						a += dVal * fprops[fluidNr].coef[type];
+						dens_total += dVal;
+					}
+
+					if (dens_total > 1) {
+						a = aSc * a / dens_total;
+					}
+					else {
+						a = aSc * ((1- dens_total) * a_fallback + dens_total * a);
+					}
+
+					c += 4 * a;
+					x[id] = (x0[id] + a * add_value) / c;
+				}
+			}
+		}
+	}
+}
+
+void FluidSystem::LinearSolve1BSO(int N, int b, list x, list x0, real aSc, real a_fallback, FluidProps::FP type)
 {
 	int i, j, k;
 
@@ -628,7 +748,7 @@ void FluidSystem::BlurB(int N, int b, list x, list x0, real a, real c)
 					real my_val = x0[id];
 					real add_value = (info & LEFT) ? x0[ID(i - 1, j)] : my_val;
 					add_value += (info & RIGHT) ? x0[ID(i + 1, j)] : my_val;
-					add_value += (info & BOTTOM) ? x0[ID(i, j -1)] : my_val;
+					add_value += (info & BOTTOM) ? x0[ID(i, j - 1)] : my_val;
 					add_value += (info & TOP) ? x0[ID(i, j + 1)] : my_val;
 
 					x[id] = (x0[id] + a * add_value) / c;
@@ -689,6 +809,11 @@ void FluidSystem::Diffuse1BS(int N, int b, list x, list x0, FluidProps::FP fpid,
 	LinearSolve1BS(N, b, x, x0, dt*N*N, visc_air, fpid);
 }
 
+
+void FluidSystem::Diffuse1BSO(int N, int b, list x, list x0, FluidProps::FP fpid, real dt)
+{
+	LinearSolve1BSO(N, b, x, x0, dt*N*N, visc_air, fpid);
+}
 
 void FluidSystem::Diffuse_blur(int N, int b, list x, list x0, real diff, real dt)
 {
@@ -874,16 +999,18 @@ void FluidSystem::ProjectB(int N, list u, list v, list p, list div)
 	for (j = 1; j <= N; j++) {
 		for (i = 1; i <= N; i++) {
 			int id = ID(i, j);
-
-			real val = 0;
 			byte info = cellInfo[id];
 
-			val += (info & RIGHT) ? u[ID(i + 1, j)] : -u[id];
-			val -= (info & LEFT) ? u[ID(i - 1, j)] : -u[id];
-			val += (info & TOP) ? v[ID(i, j + 1)] : -v[id];
-			val -= (info & BOTTOM) ? v[ID(i, j - 1)] : -v[id];
+			if (info & FLUID) {
+				real val = 0;
+				val += (info & RIGHT) ? u[ID(i + 1, j)] : -u[id];
+				val -= (info & LEFT) ? u[ID(i - 1, j)] : -u[id];
+				val += (info & TOP) ? v[ID(i, j + 1)] : -v[id];
+				val -= (info & BOTTOM) ? v[ID(i, j - 1)] : -v[id];
 
-			div[id] = -0.5f * val / N;
+				div[id] = -0.5f * val / N;
+			}
+			else div[id] = 0;
 			//div[ID(i, j)] = -0.5f * (u[ID(i + 1, j)] - u[ID(i - 1, j)] + v[ID(i, j + 1)] - v[ID(i, j - 1)]) / N;;
 		}
 	}
@@ -894,16 +1021,84 @@ void FluidSystem::ProjectB(int N, list u, list v, list p, list div)
 
 	for (j = 1; j <= N; j++) {
 		for (i = 1; i <= N; i++) {
-			byte info = cellInfo[ID(i, j)];
-			real m = p[ID(i, j)];
+			int id = ID(i, j);
+			byte info = cellInfo[id];
 
-			real l = (info & LEFT) ? p[ID(i - 1, j)] : m;
-			real r = (info & RIGHT) ? p[ID(i + 1, j)] : m;
-			real t = (info & TOP) ? p[ID(i, j + 1)] : m;
-			real b = (info & BOTTOM) ? p[ID(i, j - 1)] : m;
+			if (info & FLUID) {
+				real m = p[ID(i, j)];
 
-			u[ID(i, j)] -= 0.5f * N * (r - l);
-			v[ID(i, j)] -= 0.5f * N * (t - b);
+				real l = (info & LEFT) ? p[ID(i - 1, j)] : m;
+				real r = (info & RIGHT) ? p[ID(i + 1, j)] : m;
+				real t = (info & TOP) ? p[ID(i, j + 1)] : m;
+				real b = (info & BOTTOM) ? p[ID(i, j - 1)] : m;
+
+				u[id] -= 0.5f * N * (r - l);
+				v[id] -= 0.5f * N * (t - b);
+			}
+			else {
+				u[id] = 0;
+				v[id] = 0;
+			}
+		}
+	}
+}
+
+void FluidSystem::ProjectBO(int N, list u, list v, list p, list div)
+{
+	int i, j;
+
+	// gradient function:
+	for (j = 1; j <= N; j++) {
+		for (i = 1; i <= N; i++) {
+			int id = ID(i, j);
+			byte info = cellInfo[id];
+
+			//if (info & FLUID) {
+				real val = 0;
+
+				int lid = ID(i - 1, j);
+				int rid = ID(i + 1, j);
+				int tid = ID(i, j + 1);
+				int bid = ID(i, j - 1);
+
+				// if we can go right, its the standard.
+				// otherwise, we reflect and if there is an object to the right, we add its speed aswell
+				val += (info & RIGHT) ? u[rid] : (-u[id] + (cellInfo[rid] & FLUID ? 0 : u[rid]));
+				val -= (info & LEFT) ? u[lid] : (-u[id] + (cellInfo[lid] & FLUID ? 0 : u[lid]));
+				val += (info & TOP) ? v[tid] : (-v[id] + (cellInfo[tid] & FLUID ? 0 : v[tid]));
+				val -= (info & BOTTOM) ? v[bid] : (-v[id] + (cellInfo[bid] & FLUID ? 0 : v[bid]));
+
+				div[id] = -0.5f * val / N;
+			//}
+			//else div[id] = 0;
+			//div[ID(i, j)] = -0.5f * (u[ID(i + 1, j)] - u[ID(i - 1, j)] + v[ID(i, j + 1)] - v[ID(i, j - 1)]) / N;;
+		}
+	}
+
+	Tools::Fill<real>(p, 0);
+
+	LinearSolve1BO(N, 0, p, div, 1, 4);
+
+	for (j = 1; j <= N; j++) {
+		for (i = 1; i <= N; i++) {
+			int id = ID(i, j);
+			byte info = cellInfo[id];
+	
+			if (info & FLUID) {
+				real m = p[ID(i, j)];
+
+				real l = (info & LEFT) ? p[ID(i - 1, j)] : m;
+				real r = (info & RIGHT) ? p[ID(i + 1, j)] : m;
+				real t = (info & TOP) ? p[ID(i, j + 1)] : m;
+				real b = (info & BOTTOM) ? p[ID(i, j - 1)] : m;
+
+				u[id] -= 0.5f * N * (r - l);
+				v[id] -= 0.5f * N * (t - b);
+			}
+			else {
+				u[id] = 0;
+				v[id] = 0;
+			}
 		}
 	}
 }
@@ -965,7 +1160,7 @@ void FluidSystem::Damp(list vel, float amount, float dt)
 {
 	int c = vel.size();
 	for (int i = 0; i < c; i++) {
-		vel[c] *= powf(1-amount, dt);
+		vel[c] *= powf(1 - amount, dt);
 	}
 }
 
@@ -1017,10 +1212,10 @@ void FluidSystem::ResetCellInfo()
 	cellInfo[ID(N + 1, N + 1)] &= ~CellInfo::FLUID;
 }
 
-void FluidSystem::CallColliders()
+void FluidSystem::CallColliders(real dt)
 {
 	for (auto pfC : gColliders) {
-		pfC->FillGrid(N, cellInfo);
+		pfC->Update(N, this, cellInfo, dt);
 	}
 }
 

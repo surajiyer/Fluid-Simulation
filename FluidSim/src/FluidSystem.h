@@ -29,6 +29,7 @@ public:
 	inline void SetDensity(int x, int y, real v, int dn);
 	inline void SetDensity(int x, int y, real v);
 	void SetVelocity(int x, int y, real vx, real vy);
+	void SetObjectVelocity(int x, int y, real vx, real vy);
 
 	void AddUpdater(Tools::UpdatableR<bool, FluidUpdate>*);
 	void RemoveUpdater(Tools::UpdatableR<bool, FluidUpdate>*, bool to_delete);
@@ -79,6 +80,7 @@ private:
 	void VelStep1(real dt);		// basic velocity field
 	void VelStep1B(real dt);	// + respects border
 	void VelStep1BS(real dt);	// + respects multi fluid viscosity + air has 0 viscosity
+	void VelStep1BSO(real dt);	// + respect object movement
 
 	void AddArrDt(int N, list x, list s, real dt);
 
@@ -88,7 +90,9 @@ private:
 
 	void LinearSolve1(int N, int b, list x, list x0, real a, real c);					// basic solve
 	void LinearSolve1B(int N, int b, list x, list x0, real a, real c);					// + supports border
+	void LinearSolve1BO(int N, int b, list x, list x0, real a, real c);					// + supports object movement
 	void LinearSolve1BS(int N, int b, list x, list x0, real aSc, real a_fallback, FluidProps::FP type);  // + supports viscosity mixing (for velocity field)
+	void LinearSolve1BSO(int N, int b, list x, list x0, real aSc, real a_fallback, FluidProps::FP type);
 	void Blur(int N, int b, list x, list x0, real a, real c);							// alternate diffusion
 	void BlurB(int N, int b, list x, list x0, real a, real c);							// alternate diffusion + border
 	void LinearSolve3_not_updated(int N, int b, list x, list x0, real dt);
@@ -96,6 +100,7 @@ private:
 	void Diffuse1(int N, int b, list x, list x0, real coef, real dt);
 	void Diffuse1B(int N, int b, list x, list x0, real coef, real dt);
 	void Diffuse1BS(int N, int b, list x, list x0, FluidProps::FP fpid, real dt);
+	void Diffuse1BSO(int N, int b, list x, list x0, FluidProps::FP fpid, real dt);
 	void Diffuse_blur(int N, int b, list x, list x0, real coef, real dt);
 	void Diffuse_blurB(int N, int b, list x, list x0, real coef, real dt);
 	void Diffuse3(int N, int b, list x, list x0, real coef, real dt);
@@ -106,8 +111,9 @@ private:
 	void Advect2B(int N, int b, list d, list d0, list u, list v, real dt);
 	void Advect3(int N, int b, list d, list d0, list u, list v, real dt);
 
-	void Project(int N, list u, list v, list p, list div);
-	void ProjectB(int N, list u, list v, list p, list div);
+	void Project(int N, list u, list v, list p, list div);		// basic project
+	void ProjectB(int N, list u, list v, list p, list div);		// + supports border
+	void ProjectBO(int N, list u, list v, list p, list div);	// + supports moving objects
 
 	void VortConfinement();
 	void Damp(list vel, float amount, float dt);
@@ -127,7 +133,7 @@ private:
 	bool CanMoveNeighbour(int x0, int y0, int x1, int y1);
 	void CalcBorderFromContent();
 	void ResetCellInfo();
-	void CallColliders();
+	void CallColliders(real dt);
 	void CallBorders();
 
 public:
@@ -137,7 +143,7 @@ public:
 
 	std::vector<FluidProps> fprops;
 
-	real visc_air = 0.0002;
+	real visc_air = 0.001;
 	real damp = 0.1;
 	real visc_avg;
 	real vorticity;

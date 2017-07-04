@@ -8,11 +8,21 @@ using namespace trace;
 
 FluidCollider::FluidCollider()
 {
+	vel = Vec2(40,0);
 }
 
 
 FluidCollider::~FluidCollider()
 {
+}
+
+void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo, real dt)
+{
+	loc += vel * dt;
+	if (loc(0) > N + scale(0)) {
+		loc(0) = -scale(0);
+	}
+	UpdateChild(N, pFs, cellInfo, dt);
 }
 
 RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
@@ -22,7 +32,7 @@ RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
 	rot = r;
 }
 
-void RectCollider::FillGrid(int N, std::vector<byte>& cellInfo)
+void RectCollider::UpdateChild(int N, FluidSystem* pFs, std::vector<byte>& cellInfo, real dt)
 {
 	Eigen::Matrix3f rotMatrix;
 	Eigen::Matrix3f locMatrix;
@@ -71,6 +81,7 @@ void RectCollider::FillGrid(int N, std::vector<byte>& cellInfo)
 		int y = c.y + subY;
 		if (x <= N && y <= N && x > 0 && y > 0) {
 			cellInfo[x + (N + 2) * y] &= ~CellInfo::FLUID;
+			pFs->SetVelocity(x, y, vel(0), vel(1));
 		}
 	}
 }

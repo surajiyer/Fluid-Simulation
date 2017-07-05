@@ -49,14 +49,14 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	ms_center = Vec2(center(0), center(1));
 
 	gTracePointsWS.clear();
-	for (auto& ms_point : modelSpacePoints) {
-		auto ws_point = modelMatrix * ms_point;
+	for (auto& ms_normal : modelSpacePoints) {
+		auto ws_point = modelMatrix * ms_normal;
 		gTracePointsWS.push_back(V2f{ ws_point(0), ws_point(1) });
 	}
 
 	normals.clear();
-	for (auto& ms_point : modelSpaceNormals) {
-		auto ws_norm = modelMatrix * ms_point;
+	for (auto& ms_normal : modelSpaceNormals) {
+		auto ws_norm = modelMatrix * ms_normal;
 		auto tmp = Vec2{ ws_norm(0), ws_norm(1) };
 		tmp.normalize();
 		normals.push_back(tmp);
@@ -95,15 +95,6 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	}
 
 	UpdateChild(N, pFs, cellInfo, dt);
-
-	// Check for collisions
-	for (auto c : pFs->gColliders) {
-		// skip checking collision with itself
-		if (c == this)
-			continue;
-
-		FluidCollider::Collide(this, c);
-	}
 }
 
 void FluidCollider::AddVel(int N, real& torque, Vec2& force, int x, int y, std::vector<real>& vX, std::vector<real>& vY, FluidSystem* pFs) {
@@ -171,6 +162,7 @@ void FluidCollider::Collide(FluidCollider* A, FluidCollider* B)
 	real distance = Tools::Max(distance1, distance2);
 	Vec2 normal = distance1 > distance2 ? A->normals[face_idx_1] : B->normals[face_idx_2];
 
+	std::cout << " dist1: " << distance1 << " dist2: " << distance2 << "\r";
 	if (distance < 0) {
 		// collision response
 		FluidCollider::ApplyImpulse(A, B, normal);
@@ -203,24 +195,22 @@ real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider*
 	real bestDistance = -FLT_MAX;
 	uint32_t bestIndex;
 
-	auto A = this;
-
-	for (uint32_t i = 0; i < A->gTracePointsWS.size(); ++i)
+	for (uint32_t i = 0; i < this->gTracePointsWS.size(); ++i)
 	{
 		// Retrieve a face normal from A
-		Vec2 n = A->normals[i];
+		Vec2 n = this->normals[i];
 
 		// Retrieve support point from B along -n
 		Vec2 s = other->GetSupport(-n);
 
 		// Retrieve vertex on face from A, transform into
 		// B's model space
-		Vec2 v = A->gTracePointsWS[i].toVec2();
+		Vec2 v = this->gTracePointsWS[i].toVec2();
 
 		// Compute penetration distance (in B's model space)
 		real d = n.dot(s - v);// Dot(n, s - v);
 
-							  // Store greatest distance
+		// Store greatest distance
 		if (d > bestDistance)
 		{
 			bestDistance = d;
@@ -260,7 +250,7 @@ RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
 	rot = r;
 
 	modelSpacePoints = { Vec3(-0.5, -0.5, 1), Vec3(-0.5, 0.5, 1), Vec3(0.5, 0.5, 1), Vec3(0.5, -0.5, 1) };
-	modelSpaceNormals = { Vec3(-1, 0, 1), Vec3(0, 1, 1), Vec3(1, 0, 1), Vec3(0, -1, 1) };
+	modelSpaceNormals = { Vec3(-1, 0, 0), Vec3(0, 1, 0), Vec3(1, 0, 0), Vec3(0, -1, 0) };
 }
 
 void RectCollider::UpdateChild(int N, FluidSystem* pFs, std::vector<byte>& cellInfo, real dt)

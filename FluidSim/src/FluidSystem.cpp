@@ -1233,6 +1233,14 @@ void FluidSystem::UpdateColliders_2(real dt)
 	for (auto pfC : gColliders) {
 		pfC->ApplyForces(N, dt, this);
 	}
+
+	// Check for collisions
+	int n = gColliders.size();
+	for (int i = 0; i < n; i++) {
+		for (int j = i + 1; j < n; j++) {
+			FluidCollider::Collide(gColliders[i], gColliders[j]);
+		}
+	}
 }
 
 void FluidSystem::CallBorders()

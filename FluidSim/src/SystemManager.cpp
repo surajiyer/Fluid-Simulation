@@ -100,7 +100,7 @@ void SystemManager::Setup()
 	};
 
 	gpFluidSystem->Setup(res_inner, vorticity, props, FluidSystem::FSType::ORIGINAL_BORDERED_MF);
-	gpFluidSystem->AddCollider(new RectCollider(1+res_inner/2.0,1+res_inner/2.0,res_inner/8.0,res_inner/8.0, 0.1));
+	gpFluidSystem->AddCollider(new RectCollider(1+res_inner/2.0,1+res_inner/2.0,res_inner/6.0,res_inner/6.0, 0.1));
 	//gpFluidSystem->AddBorder(new SquareBorder());
 
 	if (gEnableRender) {

@@ -66,8 +66,10 @@ enum CellInfo : byte {
 	BOTTOM = 8,
 	// if it is a fluid cell : otherwise its inside an object or the boundary
 	FLUID = 16,
+	OBJECT = 32,
 	// Combined value for optimalization of standard cell, all others are true
-	NORMAL_CELL = 1 + 2 + 4 + 8 + 16
+	NORMAL_CELL = 1 + 2 + 4 + 8 + 16,
+	ALL_DIRS = LEFT + RIGHT + TOP + BOTTOM
 };
 
 struct BilinearCoeffs {

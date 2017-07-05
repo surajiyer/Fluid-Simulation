@@ -50,6 +50,19 @@ struct V2
 	{
 	};
 
+	Vec2 toVec2() {
+		return Vec2(x,y);
+	}
+
+	Vec3 toVec3() {
+		return Vec3(x,y,1);
+	}
+
+	_T dot(const V2& other) const
+	{
+		return x * other.x + y * other.y;
+	}
+
 	V2 operator-(const V2& _rhs) const
 	{
 		return V2(x - _rhs.x, y - _rhs.y);
@@ -67,6 +80,7 @@ struct V2
 	}
 };
 
+using V2f = V2<float>;
 using V2d = V2<double>;
 using V2i = V2<int>;
 

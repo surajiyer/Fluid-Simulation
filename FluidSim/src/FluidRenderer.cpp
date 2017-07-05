@@ -101,7 +101,9 @@ bool FluidRenderer::DoBuffer()
 		real r, g, b;
 		r = g = b = 0;
 
-		if (info[i] & FLUID) {
+		int size = surface.width;
+
+		if (info[i] & CellInfo::FLUID) {
 			real d_total = 0;
 			for (int n = 0; n < density.size(); n++) {
 				real d = density[n].Curr()[i];
@@ -115,6 +117,9 @@ bool FluidRenderer::DoBuffer()
 				g /= d_total;
 				b /= d_total;
 			}
+		}
+		else if (info[i] & CellInfo::OBJECT) {
+			b = r = 1;
 		}
 		else {
 			g = 1;

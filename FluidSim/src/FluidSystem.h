@@ -47,6 +47,8 @@ public:
 	std::vector<byte>& GetInfo();
 	list GetVelX();
 	list GetVelY();
+	byte CellInfo(int i, int j);
+	std::vector<FluidCollider*>& GetObjects();
 
 	real& Density(int x, int y, int dn);
 	real CombinedDensity(int x, int y);
@@ -133,7 +135,8 @@ private:
 	bool CanMoveNeighbour(int x0, int y0, int x1, int y1);
 	void CalcBorderFromContent();
 	void ResetCellInfo();
-	void CallColliders(real dt);
+	void UpdateColliders_1(real dt);
+	void UpdateColliders_2(real dt);
 	void CallBorders();
 
 public:
@@ -153,6 +156,7 @@ public:
 
 	FlipFlopArr<real> vX;
 	FlipFlopArr<real> vY;
+	std::vector<real> p;
 	std::vector<FlipFlopArr<real>> densList;
 
 	std::vector<real> buffer1;

@@ -1,4 +1,5 @@
 #include "FluidInteraction.h"
+#include "FluidCollider.h"
 
 
 FluidInteraction::FluidInteraction(System::InputManager* pInputManager, Tools::ResizedShouter* pSurface, FluidRenderer* pRenderer)
@@ -33,13 +34,28 @@ bool FluidInteraction::Update(FluidUpdate fu)
 		if (!m_down) return true;
 
 		i = (int) ((mx / (float) gSurface.width)*N + 1);
-		j = (int) (((gSurface.height - my) / (float) gSurface.width)*N + 1);
+		j = (int) (((gSurface.height - my) / (float) gSurface.height)*N + 1);
 
 		if (i<1 || i>N || j<1 || j>N) return true;
 
 		if (m_down) {
-			fu.fs->VelX(i, j) = force * (mx - omx);
-			fu.fs->VelY(i, j) = force * (omy - my);
+			if (fu.fs->CellInfo(i,j) & OBJECT) {
+				// find object
+				real sc = 800;
+				for (auto* ptr : fu.fs->GetObjects()) {
+					if (ptr->Contains(i, j)) {
+						real dx = sc * (mx - omx) / gSurface.width;
+						real dy = -sc * (my - omy) / gSurface.height;
+						ptr->AddVel(dx, dy);
+						//std::cout << "MOVE\n";
+						break;
+					}
+				}
+			}
+			else {
+				fu.fs->VelX(i, j) = force * (mx - omx);
+				fu.fs->VelY(i, j) = force * (omy - my);
+			}
 		}
 
 		if (m_down) {

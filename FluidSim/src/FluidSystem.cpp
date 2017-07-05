@@ -41,6 +41,8 @@ void FluidSystem::Setup(int N, real vorticity, std::vector<FluidProps>& props, F
 	vX.Resize(mem_size);
 	vY.Resize(mem_size);
 
+	p.resize(mem_size);
+
 	buffer1.resize(mem_size);
 	buffer2.resize(mem_size);
 	buffer3.resize(mem_size);
@@ -108,7 +110,7 @@ void FluidSystem::Update(real dt)
 
 	// obstacles | modifies velocity inside objects aswell
 	ResetCellInfo();
-	CallColliders(dt);
+	UpdateColliders_1(dt);
 	CalcBorderFromContent();
 	CallBorders();
 
@@ -398,6 +400,7 @@ void FluidSystem::VelStep1BS(real dt)
 
 	Diffuse1BS(N, 2, vY.Curr(), vY.Prev(), FluidProps::VISC, dt);
 
+
 	ProjectB(N, vX.Curr(), vY.Curr(), vX.Prev(), vY.Prev());
 
 	vX.Swap();
@@ -421,6 +424,8 @@ void FluidSystem::VelStep1BSO(real dt)
 
 	Diffuse1BSO(N, 2, vY.Curr(), vY.Prev(), FluidProps::VISC, dt);
 
+	UpdateColliders_2(dt);
+
 	ProjectBO(N, vX.Curr(), vY.Curr(), vX.Prev(), vY.Prev());
 
 	vX.Swap();
@@ -439,7 +444,7 @@ void FluidSystem::AddArrDt(int N, list x, list s, real dt)
 
 void FluidSystem::ZeroBorder(int N, list x)
 {
-	for (int i = 0; i <= N + 2; i++) {
+	for (int i = 0; i < N + 2; i++) {
 		x[ID(i, 0)] = 0;
 		x[ID(i, N + 1)] = 0;
 		x[ID(0, i)] = 0;
@@ -1043,7 +1048,7 @@ void FluidSystem::ProjectB(int N, list u, list v, list p, list div)
 	}
 }
 
-void FluidSystem::ProjectBO(int N, list u, list v, list p, list div)
+void FluidSystem::ProjectBO(int N, list u, list v, list p_old, list div)
 {
 	int i, j;
 
@@ -1063,6 +1068,9 @@ void FluidSystem::ProjectBO(int N, list u, list v, list p, list div)
 
 				// if we can go right, its the standard.
 				// otherwise, we reflect and if there is an object to the right, we add its speed aswell
+
+				// right is fluid - simple case
+	
 				val += (info & RIGHT) ? u[rid] : (-u[id] + (cellInfo[rid] & FLUID ? 0 : u[rid]));
 				val -= (info & LEFT) ? u[lid] : (-u[id] + (cellInfo[lid] & FLUID ? 0 : u[lid]));
 				val += (info & TOP) ? v[tid] : (-v[id] + (cellInfo[tid] & FLUID ? 0 : v[tid]));
@@ -1160,7 +1168,7 @@ void FluidSystem::Damp(list vel, float amount, float dt)
 {
 	int c = vel.size();
 	for (int i = 0; i < c; i++) {
-		vel[c] *= powf(1 - amount, dt);
+		vel[i] *= powf(1 - amount, dt);
 	}
 }
 
@@ -1183,7 +1191,8 @@ void FluidSystem::CalcBorderFromContent()
 
 			bool mIsFluid = (m & FLUID);
 			// write cell info - equal to neighbour type?
-			m = mIsFluid * FLUID;
+			// reset boundaries
+			m &= ~ALL_DIRS;
 			m |= ((!!(l & FLUID)) == mIsFluid) * LEFT;
 			m |= ((!!(r & FLUID)) == mIsFluid) * RIGHT;
 			m |= ((!!(t & FLUID)) == mIsFluid) * TOP;
@@ -1212,10 +1221,17 @@ void FluidSystem::ResetCellInfo()
 	cellInfo[ID(N + 1, N + 1)] &= ~CellInfo::FLUID;
 }
 
-void FluidSystem::CallColliders(real dt)
+void FluidSystem::UpdateColliders_1(real dt)
 {
 	for (auto pfC : gColliders) {
 		pfC->Update(N, this, cellInfo, dt);
+	}
+}
+
+void FluidSystem::UpdateColliders_2(real dt)
+{
+	for (auto pfC : gColliders) {
+		pfC->ApplyForces(N, dt, this);
 	}
 }
 
@@ -1224,6 +1240,16 @@ void FluidSystem::CallBorders()
 	for (auto pfb : gBorders) {
 		pfb->WriteBorder(N, this, cellInfo);
 	}
+}
+
+byte FluidSystem::CellInfo(int i, int j)
+{
+	return cellInfo[ID(i, j)];
+}
+
+std::vector<FluidCollider*>& FluidSystem::GetObjects()
+{
+	return gColliders;
 }
 
 BilinearCoeffs FluidSystem::RayTrace(int N, int x0, int y0, real x1, real y1, list grid)

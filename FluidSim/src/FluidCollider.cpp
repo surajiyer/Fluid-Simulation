@@ -10,7 +10,6 @@ using namespace trace;
 FluidCollider::FluidCollider()
 {
 	vel = Vec2(40, 0);
-	//inertia << 1, 1;
 }
 
 
@@ -58,7 +57,9 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	normals.clear();
 	for (auto& ms_point : modelSpaceNormals) {
 		auto ws_norm = modelMatrix * ms_point;
-		normals.push_back(Vec2{ ws_norm(0), ws_norm(1) });
+		auto tmp = Vec2{ ws_norm(0), ws_norm(1) };
+		tmp.normalize();
+		normals.push_back(tmp);
 	}
 
 	for (V2f& p : gTracePointsWS) {
@@ -94,6 +95,15 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	}
 
 	UpdateChild(N, pFs, cellInfo, dt);
+
+	// Check for collisions
+	for (auto c : pFs->gColliders) {
+		// skip checking collision with itself
+		if (c == this)
+			continue;
+
+		FluidCollider::Collide(this, c);
+	}
 }
 
 void FluidCollider::AddVel(int N, real& torque, Vec2& force, int x, int y, std::vector<real>& vX, std::vector<real>& vY, FluidSystem* pFs) {
@@ -153,24 +163,73 @@ void FluidCollider::AddVel(real dx, real dy)
 	vel += Vec2{dx, dy};
 }
 
-void FluidCollider::ApplyImpulse(const Vec2& impulse, const Vec2& contactVector)
+void FluidCollider::Collide(FluidCollider* A, FluidCollider* B)
 {
-	vel += 1.0f / mass * impulse;
-	//rot += (inertia.inverse()) * contactVector.cross(impulse);
+	uint32_t face_idx_1, face_idx_2;
+	real distance1 = A->FindAxisLeastPenetration(&face_idx_1, B);
+	real distance2 = B->FindAxisLeastPenetration(&face_idx_2, A);
+	real distance = Tools::Max(distance1, distance2);
+	Vec2 normal = distance1 > distance2 ? A->normals[face_idx_1] : B->normals[face_idx_2];
+
+	if (distance < 0) {
+		// collision response
+		FluidCollider::ApplyImpulse(A, B, normal);
+	}
 }
 
-void FluidCollider::Collide(int i, std::vector<FluidCollider*>& objs)
+void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, Vec2 normal)
 {
-	for (int j = i; j < objs.size(); j++) {
-		uint32_t face_idx_1, face_idx_2;
-		real depth_1 = FindAxisLeastPenetration(&face_idx_1, objs[j]);
-		real depth_2 = objs[j]->FindAxisLeastPenetration(&face_idx_2, this);
-		real depth = Tools::Max(depth_1, depth_2);
-		if (depth < 0) {
-			// handle collision
+	Vec2 relVel = A->vel - B->vel;
+	real contactVel = relVel.dot(normal);
 
+	if (contactVel > 0 || A->mass < 0.000001 || B->mass < 0.000001)
+		return;
+
+	// Calculate restitution
+	real e = std::min(A->coeff_restitution, B->coeff_restitution);
+
+	// Calculate impulse scalar
+	real j = -(1.0f + e) * contactVel;
+	j /= 1 / A->mass + 1 / B->mass + pow(1, 2)/A->momentOfInertia + pow(1, 2)/B->momentOfInertia;
+
+	// Apply impulse
+	Vec2 impulse = j * normal;
+	A->vel -= 1 / A->mass * impulse;
+	B->vel += 1 / B->mass * impulse;
+}
+
+real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)
+{
+	real bestDistance = -FLT_MAX;
+	uint32_t bestIndex;
+
+	auto A = this;
+
+	for (uint32_t i = 0; i < A->gTracePointsWS.size(); ++i)
+	{
+		// Retrieve a face normal from A
+		Vec2 n = A->normals[i];
+
+		// Retrieve support point from B along -n
+		Vec2 s = other->GetSupport(-n);
+
+		// Retrieve vertex on face from A, transform into
+		// B's model space
+		Vec2 v = A->gTracePointsWS[i].toVec2();
+
+		// Compute penetration distance (in B's model space)
+		real d = n.dot(s - v);// Dot(n, s - v);
+
+							  // Store greatest distance
+		if (d > bestDistance)
+		{
+			bestDistance = d;
+			bestIndex = i;
 		}
 	}
+
+	*faceIndex = bestIndex;
+	return bestDistance;
 }
 
 Vec2 FluidCollider::GetSupport(const Vec2& dir)
@@ -178,7 +237,7 @@ Vec2 FluidCollider::GetSupport(const Vec2& dir)
 	real bestProjection = -FLT_MAX;
 	Vec2 bestVertex;
 
-	for (int i = 0; i < modelSpacePoints.size(); ++i)
+	for (int i = 0; i < gTracePointsWS.size(); ++i)
 	{
 		auto v = gTracePointsWS[i].toVec2();
 		real projection = v.dot(dir);
@@ -193,39 +252,7 @@ Vec2 FluidCollider::GetSupport(const Vec2& dir)
 	return bestVertex;
 }
 
-real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* B)
-{
-	real bestDistance = -FLT_MAX;
-	uint32_t bestIndex;
 
-	auto A = this;
-
-	for (uint32_t i = 0; i < A->modelSpacePoints.size(); ++i)
-	{
-		// Retrieve a face normal from A
-		Vec2 n = A->normals[i];
-
-		// Retrieve support point from B along -n
-		Vec2 s = B->GetSupport(-n);
-
-		// Retrieve vertex on face from A, transform into
-		// B's model space
-		Vec2 v = A->gTracePointsWS[i].toVec2();
-
-		// Compute penetration distance (in B's model space)
-		real d = n.dot(s - v);// Dot(n, s - v);
-
-		// Store greatest distance
-		if (d > bestDistance)
-		{
-			bestDistance = d;
-			bestIndex = i;
-		}
-	}
-
-	*faceIndex = bestIndex;
-	return bestDistance;
-}
 RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
 {
 	loc = Vec2(ox, oy);

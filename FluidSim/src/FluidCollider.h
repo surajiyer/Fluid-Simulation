@@ -14,7 +14,7 @@ public:
 	void ApplyForces(int N, real dt, FluidSystem*);
 	bool Contains(int i, int j);
 	void AddVel(real dx, real dy);
-	void Collide(int i, std::vector<FluidCollider*>& obj_rest);
+	static void Collide(FluidCollider* A, FluidCollider* B);
 
 protected:
 	Vec2 vel;
@@ -23,8 +23,10 @@ protected:
 	Vec2 loc;
 	Vec2 scale;
 	real rot;
-
-	real mass = 0;
+	
+	real coeff_restitution = 0.1;
+	real mass = 0.1;
+	real momentOfInertia = 0.1;
 
 	Eigen::Matrix3f rotMatrix;
 	Eigen::Matrix3f locMatrix;
@@ -41,7 +43,7 @@ protected:
 	int cellOffsetY = 0;
 
 
-	void ApplyImpulse(const Vec2& impulse, const Vec2& contactVector);
+	static void ApplyImpulse(FluidCollider* A, FluidCollider* B, Vec2 normal);
 	Vec2 GetSupport(const Vec2& dir);
 	real FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* B);
 

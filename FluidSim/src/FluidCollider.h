@@ -2,6 +2,14 @@
 #include "Inc.h"
 #include "Trace.h"
 
+// Represents a single point of contact during a collision
+struct Contact
+{
+	Vec2 position;
+	Vec2 normal;
+	real penetration;
+};
+
 class FluidCollider
 {
 public:
@@ -24,18 +32,20 @@ protected:
 	Vec2 scale;
 	real rot;
 	
-	real coeff_restitution = 0.1;
+	real coeff_restitution = 1;
 	real mass = 0.1;
 	real momentOfInertia = 0.1;
 
-	Eigen::Matrix3f rotMatrix;
-	Eigen::Matrix3f locMatrix;
-	Eigen::Matrix3f scMatrix;
+	Eigen::Matrix3f gRotMatrix;
+	Eigen::Matrix3f gLocMatrix;
+	Eigen::Matrix3f gScaleMatrix;
+	Eigen::Matrix3f gModelMatrix;
 
-	std::vector<Vec3> modelSpacePoints;
-	std::vector<Vec3> modelSpaceNormals;
-	std::vector<Vec2> normals;
-	Vec2 ms_center;
+	Vec2 w_center;
+	std::vector<Vec3> m_vertices;
+	std::vector<Vec3> m_normals;
+	std::vector<Vec2> w_vertices;
+	std::vector<Vec2> w_normals;
 	std::vector<trace::V2f> gTracePointsWS;
 	std::set<trace::V2i> gCells;
 
@@ -43,7 +53,7 @@ protected:
 	int cellOffsetY = 0;
 
 
-	static void ApplyImpulse(FluidCollider* A, FluidCollider* B, Vec2 normal);
+	static void ApplyImpulse(FluidCollider* A, FluidCollider* B, const Contact* cp);
 	Vec2 GetSupport(const Vec2& dir);
 	real FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* B);
 

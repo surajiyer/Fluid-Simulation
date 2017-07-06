@@ -18,6 +18,6 @@ class FluidInteraction;
 class FluidCollider;
 class FluidBorder;
 
-namespace FluidUpdaters{
-class FluidGen;
+namespace FluidUpdaters {
+	class FluidGen;
 }

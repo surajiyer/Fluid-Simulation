@@ -31,35 +31,37 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 		}
 	}
 
-	rotMatrix <<
+	gRotMatrix <<
 		cos(rot), -sin(rot), 0,
 		sin(rot), cos(rot), 0,
 		0, 0, 1;
-	scMatrix <<
+	gScaleMatrix <<
 		scale(0), 0, 0,
 		0, scale(1), 0,
 		0, 0, 1;
-	locMatrix <<
+	gLocMatrix <<
 		1, 0, loc(0),
 		0, 1, loc(1),
 		0, 0, 1;
-	Eigen::Matrix3f modelMatrix = locMatrix * scMatrix * rotMatrix;
+	gModelMatrix = gLocMatrix * gScaleMatrix * gRotMatrix;
 
-	auto center = modelMatrix * Vec3(0,0,1);
-	ms_center = Vec2(center(0), center(1));
+	auto center = gModelMatrix * Vec3(0,0,1);
+	w_center = Vec2(center(0), center(1));
 
+	w_vertices.clear();
 	gTracePointsWS.clear();
-	for (auto& ms_normal : modelSpacePoints) {
-		auto ws_point = modelMatrix * ms_normal;
-		gTracePointsWS.push_back(V2f{ ws_point(0), ws_point(1) });
+	for (auto& n : m_vertices) {
+		auto v = gModelMatrix * n;
+		w_vertices.push_back(Vec2{v(0), v(1)});
+		gTracePointsWS.push_back(V2f{ v(0), v(1) });
 	}
 
-	normals.clear();
-	for (auto& ms_normal : modelSpaceNormals) {
-		auto ws_norm = modelMatrix * ms_normal;
-		auto tmp = Vec2{ ws_norm(0), ws_norm(1) };
+	w_normals.clear();
+	for (auto& n : m_normals) {
+		auto v = gModelMatrix * n;
+		auto tmp = Vec2{ v(0), v(1) };
 		tmp.normalize();
-		normals.push_back(tmp);
+		w_normals.push_back(tmp);
 	}
 
 	for (V2f& p : gTracePointsWS) {
@@ -102,7 +104,7 @@ void FluidCollider::AddVel(int N, real& torque, Vec2& force, int x, int y, std::
 	int id = x + (N + 2) * y;
 	auto vel = Vec2{ vX[id], vY[id] };
 	force += vel;
-	auto arm = Vec2(x, y) - ms_center;
+	auto arm = Vec2(x, y) - w_center;
 	torque += d * ( (arm(0) * vel(1) - arm(1)*vel(0)) / (arm(0)*arm(0) + arm(1)*arm(1))); //(Vec2(x,y) - ms_center) * vel;
 }
 
@@ -159,21 +161,24 @@ void FluidCollider::Collide(FluidCollider* A, FluidCollider* B)
 	uint32_t face_idx_1, face_idx_2;
 	real distance1 = A->FindAxisLeastPenetration(&face_idx_1, B);
 	real distance2 = B->FindAxisLeastPenetration(&face_idx_2, A);
-	real distance = Tools::Max(distance1, distance2);
-	Vec2 normal = distance1 > distance2 ? A->normals[face_idx_1] : B->normals[face_idx_2];
+
+	Contact cp;
+	cp.penetration = Tools::Max(distance1, distance2);
+	cp.normal = distance1 > distance2 ? A->w_normals[face_idx_1] : B->w_normals[face_idx_2];
 
 	std::cout << " dist1: " << distance1 << " dist2: " << distance2 << "\r";
-	if (distance < 0) {
+	if (cp.penetration < 0) {
 		// collision response
-		FluidCollider::ApplyImpulse(A, B, normal);
+		FluidCollider::ApplyImpulse(A, B, &cp);
 	}
 }
 
-void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, Vec2 normal)
+void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, const Contact* cp)
 {
 	Vec2 relVel = A->vel - B->vel;
-	real contactVel = relVel.dot(normal);
+	real contactVel = relVel.dot(cp->normal);
 
+	// Do not resolve if velocities are separating
 	if (contactVel > 0 || A->mass < 0.000001 || B->mass < 0.000001)
 		return;
 
@@ -182,12 +187,17 @@ void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, Vec2 normal
 
 	// Calculate impulse scalar
 	real j = -(1.0f + e) * contactVel;
-	j /= 1 / A->mass + 1 / B->mass + pow(1, 2)/A->momentOfInertia + pow(1, 2)/B->momentOfInertia;
+	j /= 1 / A->mass + 1 / B->mass + pow(1, 2) / A->momentOfInertia + pow(1, 2) / B->momentOfInertia;
 
 	// Apply impulse
-	Vec2 impulse = j * normal;
+	Vec2 impulse = j * cp->normal;
+	Vec2 contactPoint = A->w_center + A->scale(0) * cp->normal;/////////////
+	Vec2 aContactVec = A->w_center - contactPoint;
+	Vec2 bContactVec = B->w_center - contactPoint;
 	A->vel -= 1 / A->mass * impulse;
 	B->vel += 1 / B->mass * impulse;
+	A->angVel -= 1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0));
+	B->angVel += 1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0));
 }
 
 real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)
@@ -195,17 +205,17 @@ real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider*
 	real bestDistance = -FLT_MAX;
 	uint32_t bestIndex;
 
-	for (uint32_t i = 0; i < this->gTracePointsWS.size(); ++i)
+	for (uint32_t i = 0; i < this->w_vertices.size(); ++i)
 	{
 		// Retrieve a face normal from A
-		Vec2 n = this->normals[i];
+		Vec2 n = this->w_normals[i];
 
 		// Retrieve support point from B along -n
 		Vec2 s = other->GetSupport(-n);
 
 		// Retrieve vertex on face from A, transform into
 		// B's model space
-		Vec2 v = this->gTracePointsWS[i].toVec2();
+		Vec2 v = this->w_vertices[i];
 
 		// Compute penetration distance (in B's model space)
 		real d = n.dot(s - v);// Dot(n, s - v);
@@ -227,9 +237,9 @@ Vec2 FluidCollider::GetSupport(const Vec2& dir)
 	real bestProjection = -FLT_MAX;
 	Vec2 bestVertex;
 
-	for (int i = 0; i < gTracePointsWS.size(); ++i)
+	for (int i = 0; i < w_vertices.size(); ++i)
 	{
-		auto v = gTracePointsWS[i].toVec2();
+		auto v = w_vertices[i];
 		real projection = v.dot(dir);
 
 		if (projection > bestProjection)
@@ -249,8 +259,8 @@ RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
 	scale = Vec2(w, h);
 	rot = r;
 
-	modelSpacePoints = { Vec3(-0.5, -0.5, 1), Vec3(-0.5, 0.5, 1), Vec3(0.5, 0.5, 1), Vec3(0.5, -0.5, 1) };
-	modelSpaceNormals = { Vec3(-1, 0, 0), Vec3(0, 1, 0), Vec3(1, 0, 0), Vec3(0, -1, 0) };
+	m_vertices = { Vec3(-0.5, -0.5, 1), Vec3(-0.5, 0.5, 1), Vec3(0.5, 0.5, 1), Vec3(0.5, -0.5, 1) };
+	m_normals = { Vec3(-1, 0, 0), Vec3(0, 1, 0), Vec3(1, 0, 0), Vec3(0, -1, 0) };
 }
 
 void RectCollider::UpdateChild(int N, FluidSystem* pFs, std::vector<byte>& cellInfo, real dt)

@@ -199,13 +199,13 @@ void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, const Conta
 
 	// Apply impulse
 	Vec2 impulse = j * cp->normal;
-	Vec2 contactPoint = A->w_center + A->scale(0) * cp->normal;/////////////
+	Vec2 contactPoint = A->w_center + A->w_vertices[0] * cp->normal; // TODO: Need to find correct contact point
 	Vec2 aContactVec = A->w_center - contactPoint;
 	Vec2 bContactVec = B->w_center - contactPoint;
 	A->vel += 1 / A->mass * impulse;
 	B->vel -= 1 / B->mass * impulse;
-	A->angVel += 1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0));
-	B->angVel -= 1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0));
+	A->angVel += std::max(1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0)), 10.0f);
+	B->angVel -= std::max(1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0)), 10.0f);
 }
 
 real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)

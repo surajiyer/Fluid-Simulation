@@ -101,7 +101,7 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 }
 
 void FluidCollider::AddVel(int N, real& torque, Vec2& force, int x, int y, std::vector<real>& vX, std::vector<real>& vY, FluidSystem* pFs) {
-	real d = 0.1 + Tools::Min(pFs->CombinedDensity(x, y), 0.9f);
+	real d = 0.2 + Tools::Min(pFs->CombinedDensity(x, y), 0.8f);
 	int id = x + (N + 2) * y;
 	auto vel = Vec2{ vX[id], vY[id] };
 	force += vel;

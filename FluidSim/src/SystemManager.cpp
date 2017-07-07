@@ -183,12 +183,13 @@ void SystemManager::ReadInput()
 			}, "Blower"
 		},
 		{ 2, [](FluidSystem* fs) {
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 1));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 0.5, 1.8, 0));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.99, -1, 1, 0.01, 0.5, 1.8, 1));
 			}, "Two blowers"
 		},
 		{ 3, [](FluidSystem* fs) {
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 2, 1.8, 0));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.5, 0.5, 1, 1, 0.01, 1, 0.8, 1));
 				fs->AddBorder(new SquareBorder());
 			}, "No-thickness border"
 		},
@@ -196,7 +197,7 @@ void SystemManager::ReadInput()
 				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
 				int res_inner = fs->GetN_inner();
 				fs->AddCollider(new RectCollider(1 + res_inner / 2.0, 1 + res_inner / 2.0, res_inner / 6.0, res_inner / 6.0, 0.1));
-				fs->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
+				//fs->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
 			}, "Objects"
 		},
 	};

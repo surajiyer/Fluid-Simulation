@@ -90,7 +90,7 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	int res_inner = 64 * 3;
+	int res_inner = 64 * 2;
 	real visc = 0.0001f;
 	real vorticity = 0.55f; // if < 0.0001 viscocity, high vorticity will behave irratic
 

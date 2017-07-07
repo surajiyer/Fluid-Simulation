@@ -22,12 +22,14 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	loc += vel * dt;
 	rot += angVel * dt;
 
+	real bounce_force = 50;
+
 	for (int i = 0; i < 2; i++) {
-		if (loc(i) > N + scale(i)) {
-			loc(i) = -scale(i);
+		if (loc(i) > N + 2) {
+			vel(i) -= (loc(i) - N-2) * bounce_force * dt;
 		}
-		if (loc(i) < -scale(i)) {
-			loc(i) += N+2;
+		if (loc(i) < 0) {
+			vel(i) += (-loc(i)) * bounce_force * dt;
 		}
 	}
 
@@ -60,8 +62,7 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 	for (auto& n : m_normals) {
 		auto v = gModelMatrix * n;
 		auto tmp = Vec2{ v(0), v(1) };
-		tmp.normalize();
-		w_normals.push_back(tmp);
+		w_normals.push_back(tmp.normalized());
 	}
 
 	for (V2f& p : gTracePointsWS) {
@@ -119,7 +120,7 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 	auto& vX = pFs->GetVelX();
 	auto& vY = pFs->GetVelY();
 
-	for (auto c : gCells) {
+	if (false) for (auto c : gCells) {
 		int x = c.x + cellOffsetX;
 		int y = c.y + cellOffsetY;
 		if (x <= N && y <= N && x > 0 && y > 0) {
@@ -141,9 +142,9 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 	}
 
 	this->vel += dt * force / mass;
-	this->vel *= powf(0.9, dt);
+	this->vel *= powf(0.8, dt);
 	this->angVel += dt * torque;
-	this->angVel *= powf(0.9, dt);
+	this->angVel *= powf(0.8, dt);
 }
 
 bool FluidCollider::Contains(int i, int j)
@@ -166,7 +167,7 @@ void FluidCollider::Collide(FluidCollider* A, FluidCollider* B)
 	cp.penetration = Tools::Max(distance1, distance2);
 	cp.normal = distance1 > distance2 ? A->w_normals[face_idx_1] : B->w_normals[face_idx_2];
 
-	std::cout << " dist1: " << distance1 << " dist2: " << distance2 << "\r";
+	std::cout << "\ndist1: " << distance1 << " dist2: " << distance2 << "\n";
 	if (cp.penetration < 0) {
 		// collision response
 		FluidCollider::ApplyImpulse(A, B, &cp);

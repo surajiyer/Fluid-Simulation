@@ -9,7 +9,7 @@ using namespace trace;
 
 FluidCollider::FluidCollider()
 {
-	vel = Vec2(40, 0);
+	
 }
 
 
@@ -101,12 +101,15 @@ void FluidCollider::Update(int N, FluidSystem* pFs, std::vector<byte>& cellInfo,
 }
 
 void FluidCollider::AddVel(int N, real& torque, Vec2& force, int x, int y, std::vector<real>& vX, std::vector<real>& vY, FluidSystem* pFs) {
-	real d = 0.2 + Tools::Min(pFs->CombinedDensity(x, y), 0.8f);
+	real d = 0.2f + Tools::Min(pFs->CombinedDensity(x, y), 0.8f);
 	int id = x + (N + 2) * y;
 	auto vel = Vec2{ vX[id], vY[id] };
 	force += vel;
 	auto arm = Vec2(x, y) - w_center;
-	torque += d * ( (arm(0) * vel(1) - arm(1)*vel(0)) / (arm(0)*arm(0) + arm(1)*arm(1))); //(Vec2(x,y) - ms_center) * vel;
+	real div = arm(0)*arm(0) + arm(1)*arm(1);
+	if (div > 0.00001) {
+		torque += d * ((arm(0) * vel(1) - arm(1)*vel(0)) / div); //(Vec2(x,y) - ms_center) * vel;
+	}
 }
 
 void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
@@ -141,10 +144,17 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 		}
 	}
 
+	// damp
 	this->vel += dt * force / mass;
 	this->vel *= powf(0.9, dt);
 	this->angVel += dt * torque / momentOfInertia;
 	this->angVel *= powf(0.9, dt);
+
+	// drag
+	real v2 = vel.norm(); v2 *= v2;
+	vel /= (1 + 0.00001 * v2);
+	real av2 = angVel * angVel;
+	angVel /= (1 + 0.001 * av2);
 }
 
 bool FluidCollider::Contains(int i, int j)
@@ -199,13 +209,13 @@ void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, const Conta
 
 	// Apply impulse
 	Vec2 impulse = j * cp->normal;
-	Vec2 contactPoint = A->w_center + A->w_vertices[0] * cp->normal; // TODO: Need to find correct contact point
+	Vec2 contactPoint = A->w_vertices[0] - A->w_center; // TODO: Need to find correct contact point
 	Vec2 aContactVec = A->w_center - contactPoint;
 	Vec2 bContactVec = B->w_center - contactPoint;
 	A->vel += 1 / A->mass * impulse;
 	B->vel -= 1 / B->mass * impulse;
-	A->angVel += std::max(1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0)), 10.0f);
-	B->angVel -= std::max(1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0)), 10.0f);
+	A->angVel += std::min(1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0)), 0.1f);
+	B->angVel -= std::min(1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0)), 0.1f);
 }
 
 real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)
@@ -264,7 +274,7 @@ Vec2 FluidCollider::GetSupport(const Vec2& dir)
 
 RectCollider::RectCollider(int ox, int oy, real w, real h, real r)
 {
-	loc = Vec2(ox, oy);
+ 	loc = Vec2(ox, oy);
 	scale = Vec2(w, h);
 	rot = r;
 

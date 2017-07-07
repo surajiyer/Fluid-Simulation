@@ -14,6 +14,7 @@ public:
 	~SystemManager();
 
 	void Run();
+	static void DefaultScene(FluidSystem*);
 
 private:
 	void Setup();

@@ -175,6 +175,14 @@ void FluidSystem::ClearUpdaters()
 		delete pU;
 	}
 
+	for (auto& pU : gBorders) {
+		delete pU;
+	}
+
+	for (auto& pU : gColliders) {
+		delete pU;
+	}
+
 	gUpdaters.clear();
 	gBorders.clear();
 	gColliders.clear();

@@ -51,7 +51,7 @@ bool FluidInteraction::Update(FluidUpdate fu)
 			}
 
 			if (locked) {
-				real dragForce = 0.5;
+				real dragForce = 1;
 				auto objPos = gpLockObj->GetLoc();
 				real mPosX = ((mx / (float) gSurface.width)*NOuter);
 				real mPosY = (((gSurface.height - my) / (float) gSurface.height)*NOuter);

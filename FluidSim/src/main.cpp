@@ -83,6 +83,7 @@ void Test() {
 }
 
 void main() {
+	std::cout << "Press SPACE to start/stop the simulation, press \"t\" to do a single timestep.";
 	SystemManager sm;
 	sm.Run();
 }

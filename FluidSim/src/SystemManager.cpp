@@ -86,6 +86,11 @@ void SystemManager::Run()
 	// if (gpEngine) gpEngine->Run_end();
 }
 
+void SystemManager::DefaultScene(FluidSystem* fs)
+{
+	fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+}
+
 void SystemManager::Setup()
 {
 	gInputListener = new System::InputManager_get();
@@ -101,7 +106,7 @@ void SystemManager::Setup()
 	};
 
 	gpFluidSystem->Setup(res_inner, vorticity, props, FluidSystem::FSType::ORIGINAL_BORDERED_MF);
-
+	DefaultScene(gpFluidSystem);
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
@@ -148,7 +153,7 @@ void SystemManager::ReadInput()
 
 	if (gInputListener->IsKeyPressed('V')) {
 		gpFluidSystem->ToggleVort();
-		std::cout << " Vorticity : " << (gpFluidSystem->useVort ? "Enabled\t\t" : "Disabled\t\t");
+		std::cout << " > Vorticity : " << (gpFluidSystem->useVort ? "Enabled\t\t" : "Disabled\t\t");
 	}
 
 	if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Fkey(1))) {
@@ -179,7 +184,7 @@ void SystemManager::ReadInput()
 	//boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
 	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
 		{ 1, [](FluidSystem* fs) {
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+				DefaultScene(fs);
 			}, "Blower"
 		},
 		{ 2, [](FluidSystem* fs) {
@@ -188,16 +193,16 @@ void SystemManager::ReadInput()
 			}, "Two blowers"
 		},
 		{ 3, [](FluidSystem* fs) {
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 2, 1.8, 0));
-				fs->AddUpdater(new FluidUpdaters::Blower(0.5, 0.5, 1, 1, 0.01, 1, 0.8, 1));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 1));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.5, 0.5, -1, -1, 0.01, 0.1, 0.8, 0));
 				fs->AddBorder(new SquareBorder());
 			}, "No-thickness border"
 		},
 		{ 4, [](FluidSystem* fs) {
-				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+ 				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
 				int res_inner = fs->GetN_inner();
 				fs->AddCollider(new RectCollider(1 + res_inner / 2.0, 1 + res_inner / 2.0, res_inner / 6.0, res_inner / 6.0, 0.1));
-				//fs->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
+				fs->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
 			}, "Objects"
 		},
 	};

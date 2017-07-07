@@ -26,12 +26,12 @@ public:
 	inline Vec2 GetLoc() { return loc; }
 
 protected:
-	Vec2 vel;
-	real angVel;
+	Vec2 vel = {0,0};
+	real angVel = 0;
 
 	Vec2 loc;
 	Vec2 scale;
-	real rot;
+	real rot = 0;
 	
 	real coeff_restitution = 1;
 	real mass = 0.1;

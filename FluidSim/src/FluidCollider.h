@@ -23,6 +23,7 @@ public:
 	bool Contains(int i, int j);
 	void AddVel(real dx, real dy);
 	static void Collide(FluidCollider* A, FluidCollider* B);
+	inline Vec2 GetLoc() { return loc; }
 
 protected:
 	Vec2 vel;

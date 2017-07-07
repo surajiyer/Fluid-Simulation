@@ -32,5 +32,9 @@ protected:
 	real force = 2;
 	int mx = 0, my = 0, omx = 0, omy = 0;
 	bool m_down = false;
+
+	FluidCollider* gpLockObj = nullptr;
+	bool locked = false;
+	bool first = false;
 };
 

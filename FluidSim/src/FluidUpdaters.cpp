@@ -30,26 +30,35 @@ bool Square::Update(FluidUpdate fu)
 	return false;
 }
 
-Blower::Blower(int dn)
+Blower::Blower(real x, real y, real dx, real dy, real sc, real v, real d, int fid)
 {
-	this->dn = dn;
+	this->px = x;
+	this->py = y;
+	this->dx = dx;
+	this->dy = dy;
+	this->scale = sc;
+	this->vel = v;
+	this->dens = d;
+	this->fid = fid;
 }
 
 bool Blower::Update(FluidUpdate fu)
 {
 	if (fu.type == FluidUpdate::VEL) {
-		real d = 5;
-		real v = 1.8 * fu.fs->GetSize().width / (64.0f);
-		real vx = dn == 0 ? v : -v;
-		real vy = dn == 0 ? v : v;
+		real d = dens;
+		real v = this->vel * fu.fs->GetSize().width / (64.0f);
+
+		real vx = dx * v;
+		real vy = dy * v;
+
 		int N = fu.fs->N;
-		int size = 2;
-		int offset = 3;
-		int low = 1 + (dn == 0 ? offset : (N - offset - size));
-		int high = 1 + (dn == 0 ? (offset + size) : (N - offset));
-		for (int i = low; i < high; i++) {
-			for (int j = offset; j < offset + size; j++) {
-				fu.fs->AddFluid(i, j, d, vx, vy, dn);
+		int lowX = 1 + -scale * N + px * N;
+		int highX = 1 + scale * N + px * N;
+		int lowY = 1 + -scale * N + py * N;
+		int highY = 1 + scale * N + py * N;
+		for (int i = lowY; i < highY; i++) {
+			for (int j = lowX; j < highX; j++) {
+				fu.fs->AddFluid(i, j, d, vx, vy, fid);
 			}
 		}
 	}

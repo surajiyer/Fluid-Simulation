@@ -62,18 +62,19 @@ void SystemManager::Run()
 			std::cout << "\rDT (ms): " << dt * 1000
 				<< " \tAvg. " << 1000 * gTimeAnalyse.AvgDt()
 				<< " \tMax. " << 1000 * gTimeAnalyse.dt_max
-				<< " \tMass " << gpFluidSystem->TotalInnerMass();
+				//<< " \tMass " << gpFluidSystem->TotalInnerMass()
+				;
 
 			gRefreshVisual = true;
 			if (gEnableRender && gpFluidRenderer) gpFluidRenderer->DoBuffer();
 		}
 		else {
- 			if (gRefreshVisual && gEnableRender && gpFluidRenderer) {
- 				//gpFluidSystem->RecalculateForces(); // for visualization
- 				if (gpFluidRenderer->DoBuffer()) {
- 					gRefreshVisual = false;
- 				}
- 			}
+			if (gRefreshVisual && gEnableRender && gpFluidRenderer) {
+				//gpFluidSystem->RecalculateForces(); // for visualization
+				if (gpFluidRenderer->DoBuffer()) {
+					gRefreshVisual = false;
+				}
+			}
 
 			t = Tools::TimeHelp::GetTime();
 		}
@@ -90,29 +91,27 @@ void SystemManager::Setup()
 	gInputListener = new System::InputManager_get();
 	gpFluidSystem = new FluidSystem();
 
-	int res_inner = 64 * 2;
+	int res_inner = 64 * 3;
 	real visc = 0.0001f;
 	real vorticity = 0.55f; // if < 0.0001 viscocity, high vorticity will behave irratic
 
 	std::vector<FluidProps> props = {
-		{ { 0.0000f,	0.0001f }, {	0.05f,	0.05f,	1.0f} },
-		{ { 0.00005f,	0.0001f }, {	1.0f,	0.05f,	0.05f} },
+		{ { 0.000001f,	0.0001f }, {	0.05f,	0.05f,	1.0f} },
+		{ { 0.0001f,	0.0001f }, {	1.0f,	0.05f,	0.05f} },
 	};
 
 	gpFluidSystem->Setup(res_inner, vorticity, props, FluidSystem::FSType::ORIGINAL_BORDERED_MF);
-	gpFluidSystem->AddCollider(new RectCollider(1 + res_inner / 2.0, 1 + res_inner / 2.0, res_inner / 6.0, res_inner / 6.0, 0.1));
-	gpFluidSystem->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
-	//gpFluidSystem->AddBorder(new SquareBorder());
+
 
 	if (gEnableRender) {
 		gpEngine = new GLCore::GLEngine();
-		gpEngine->BootInfo().window_info.windowedPrefResolution = {800,800};
-		gpEngine->RunAsync();	
+		gpEngine->BootInfo().window_info.windowedPrefResolution = { 800,800 };
+		gpEngine->RunAsync();
 		gpFluidRenderer = new FluidRenderer(gpEngine);
 		gpFluidRenderer->SetFluidSystem(gpFluidSystem);
 		gpFluidInteraction = new FluidInteraction(gpEngine->GetWindow()->GetInputManager(), gpEngine->GetWindow(), gpFluidRenderer);
 		gpFluidSystem->AddUpdater(gpFluidInteraction);
-	}	
+	}
 }
 
 void SystemManager::Update(float dt)
@@ -142,16 +141,14 @@ void SystemManager::ReadInput()
 
 	// press "R" to reset the particle system
 	if (gInputListener->IsKeyPressed('R')) {
-		gpFluidSystem->Clear();
-		Tools::RemoveOneVal(gpFluidSystem->gUpdaters, (Tools::UpdatableR<bool, FluidUpdate>*) gpFluidInteraction);
-		gpFluidSystem->ClearUpdaters();
-		gpFluidSystem->AddUpdater(gpFluidInteraction);
+		ResetSystem();
 		gTimeAnalyse.Reset();
 		gRefreshVisual = true;
 	}
 
 	if (gInputListener->IsKeyPressed('V')) {
-		gpFluidSystem->ToggleVert();
+		gpFluidSystem->ToggleVort();
+		std::cout << " Vorticity : " << (gpFluidSystem->useVort ? "Enabled\t\t" : "Disabled\t\t");
 	}
 
 	if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Fkey(1))) {
@@ -180,19 +177,50 @@ void SystemManager::ReadInput()
 
 	System::InputManager::AState boardState;
 	//boardState.Shift = System::InputManager::AStateTypeLR::EITHER_DOWN;
- 	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
-		{ 1, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower(0)); }, "Blower" },
-		{ 2, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Blower(1)); }, "Blower" },
-		{ 3, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Square()); }, "Square" },
-		{ 4, [](FluidSystem* fs) { fs->AddUpdater(new FluidUpdaters::Gravity()); }, "Gravity" },
- 	};
+	static std::vector<std::tuple<int, FSFunc, std::string>> scene_key_mapping = {
+		{ 1, [](FluidSystem* fs) {
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+			}, "Blower"
+		},
+		{ 2, [](FluidSystem* fs) {
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 1));
+			}, "Two blowers"
+		},
+		{ 3, [](FluidSystem* fs) {
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+				fs->AddBorder(new SquareBorder());
+			}, "No-thickness border"
+		},
+		{ 4, [](FluidSystem* fs) {
+				fs->AddUpdater(new FluidUpdaters::Blower(0.01, 0.01, 1, 1, 0.01, 1, 1.8, 0));
+				int res_inner = fs->GetN_inner();
+				fs->AddCollider(new RectCollider(1 + res_inner / 2.0, 1 + res_inner / 2.0, res_inner / 6.0, res_inner / 6.0, 0.1));
+				fs->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
+			}, "Objects"
+		},
+	};
 
- 	for (auto entry : scene_key_mapping) {
- 		if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Nr(std::get<0>(entry)), boardState)) {
- 			std::get<1>(entry)(gpFluidSystem);
- 			std::cout << " > Scene set to: " << std::get<2>(entry) << " \t\t";
- 		}
- 	}
+	//	gpFluidSystem->AddCollider(new RectCollider(1 + res_inner / 2.0, 1 + res_inner / 2.0, res_inner / 6.0, res_inner / 6.0, 0.1));
+	//gpFluidSystem->AddCollider(new RectCollider(1 + res_inner / 4.0, 1 + res_inner / 4.0, res_inner / 8.0, res_inner / 8.0, 0.1));
+	//gpFluidSystem->AddBorder(new SquareBorder());
+
+
+	for (auto entry : scene_key_mapping) {
+		if (gInputListener->IsKeyPressed(System::InputManager::KeyCodes::Nr(std::get<0>(entry)), boardState)) {
+			this->ResetSystem();
+			std::get<1>(entry)(gpFluidSystem);
+			std::cout << " > Scene set to: " << std::get<2>(entry) << " \t\t";
+		}
+	}
+}
+
+void SystemManager::ResetSystem()
+{
+	gpFluidSystem->Clear();
+	Tools::RemoveOneVal(gpFluidSystem->gUpdaters, (Tools::UpdatableR<bool, FluidUpdate>*) gpFluidInteraction);
+	gpFluidSystem->ClearUpdaters();
+	gpFluidSystem->AddUpdater(gpFluidInteraction);
 }
 
 // void SystemManager::RenewRenderer()

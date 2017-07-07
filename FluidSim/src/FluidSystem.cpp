@@ -127,7 +127,7 @@ void FluidSystem::Update(real dt)
 	Damp(vY.Curr(), damp, dt);
 }
 
-void FluidSystem::ToggleVert()
+void FluidSystem::ToggleVort()
 {
 	useVort = !useVort;
 }
@@ -176,6 +176,8 @@ void FluidSystem::ClearUpdaters()
 	}
 
 	gUpdaters.clear();
+	gBorders.clear();
+	gColliders.clear();
 }
 
 Tools::Surface2D<int> FluidSystem::GetSize()

@@ -120,7 +120,7 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 	auto& vX = pFs->GetVelX();
 	auto& vY = pFs->GetVelY();
 
-	if (false) for (auto c : gCells) {
+	for (auto c : gCells) {
 		int x = c.x + cellOffsetX;
 		int y = c.y + cellOffsetY;
 		if (x <= N && y <= N && x > 0 && y > 0) {
@@ -142,14 +142,21 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 	}
 
 	this->vel += dt * force / mass;
-	this->vel *= powf(0.7, dt);
-	this->angVel += dt * torque;
-	this->angVel *= powf(0.7, dt);
+	this->vel *= powf(0.9, dt);
+	this->angVel += dt * torque / momentOfInertia;
+	this->angVel *= powf(0.9, dt);
 }
 
 bool FluidCollider::Contains(int i, int j)
 {
-	return gCells.find(V2i{ i,j }) != gCells.end();
+	auto val = V2i(i - cellOffsetX, j - cellOffsetY);
+	for (auto entry : gCells) {
+		if (val == entry) {
+			return true;
+		}
+	}
+	return false;
+	//gCells.find(V2i{ i,j }) != gCells.end();
 }
 
 void FluidCollider::AddVel(real dx, real dy)
@@ -167,7 +174,7 @@ void FluidCollider::Collide(FluidCollider* A, FluidCollider* B)
 	cp.penetration = Tools::Max(distance1, distance2);
 	cp.normal = distance1 > distance2 ? A->w_normals[face_idx_1] : B->w_normals[face_idx_2];
 
-	std::cout << "\ndist1: " << distance1 << " dist2: " << distance2 << "\n";
+	//std::cout << "\ndist1: " << distance1 << " dist2: " << distance2 << "\n";
 	if (cp.penetration < 0) {
 		// collision response
 		FluidCollider::ApplyImpulse(A, B, &cp);
@@ -204,9 +211,10 @@ void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, const Conta
 real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)
 {
 	real bestDistance = -FLT_MAX;
-	uint32_t bestIndex;
+	uint32_t bestIndex = 0;
 
-	for (uint32_t i = 0; i < this->w_vertices.size(); ++i)
+	uint32_t size = w_vertices.size();
+	for (uint32_t i = 0; i < size; ++i)
 	{
 		// Retrieve a face normal from A
 		Vec2 n = this->w_normals[i];

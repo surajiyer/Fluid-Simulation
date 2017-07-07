@@ -24,7 +24,7 @@ public:
 	void SetType(FSType);
 	void Update(real dt);
 
-	void ToggleVert();
+	void ToggleVort();
 
 	inline void SetDensity(int x, int y, real v, int dn);
 	inline void SetDensity(int x, int y, real v);

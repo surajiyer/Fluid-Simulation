@@ -19,6 +19,7 @@ private:
 	void Setup();
 	void Update(float dt);
 	void ReadInput();
+	void ResetSystem();
 
 	typedef void (*FSFunc)(FluidSystem*);
 

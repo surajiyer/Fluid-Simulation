@@ -34,7 +34,7 @@ protected:
 	
 	real coeff_restitution = 1;
 	real mass = 0.1;
-	real momentOfInertia = 0.1;
+	real momentOfInertia = 10.0;
 
 	Eigen::Matrix3f gRotMatrix;
 	Eigen::Matrix3f gLocMatrix;

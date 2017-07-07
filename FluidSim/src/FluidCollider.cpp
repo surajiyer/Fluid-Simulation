@@ -142,9 +142,9 @@ void FluidCollider::ApplyForces(int N, real dt, FluidSystem* pFs)
 	}
 
 	this->vel += dt * force / mass;
-	this->vel *= powf(0.8, dt);
+	this->vel *= powf(0.7, dt);
 	this->angVel += dt * torque;
-	this->angVel *= powf(0.8, dt);
+	this->angVel *= powf(0.7, dt);
 }
 
 bool FluidCollider::Contains(int i, int j)
@@ -195,10 +195,10 @@ void FluidCollider::ApplyImpulse(FluidCollider* A, FluidCollider* B, const Conta
 	Vec2 contactPoint = A->w_center + A->scale(0) * cp->normal;/////////////
 	Vec2 aContactVec = A->w_center - contactPoint;
 	Vec2 bContactVec = B->w_center - contactPoint;
-	A->vel -= 1 / A->mass * impulse;
-	B->vel += 1 / B->mass * impulse;
-	A->angVel -= 1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0));
-	B->angVel += 1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0));
+	A->vel += 1 / A->mass * impulse;
+	B->vel -= 1 / B->mass * impulse;
+	A->angVel += 1 / A->momentOfInertia * (aContactVec(0)*impulse(1) - aContactVec(1)*impulse(0));
+	B->angVel -= 1 / B->momentOfInertia * (bContactVec(0)*impulse(1) - bContactVec(1)*impulse(0));
 }
 
 real FluidCollider::FindAxisLeastPenetration(uint32_t *faceIndex, FluidCollider* other)
